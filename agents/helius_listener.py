@@ -9,7 +9,8 @@ import aiohttp
 from aiohttp import web
 from rich.console import Console
 from rich.panel import Panel
-from core.paper_engine import paper_engine
+from core.paper_engine import PaperTradingEngine
+paper_engine = PaperTradingEngine()
 
 console = Console()
 BASE_DIR = "/home/kilpi/trading_bot"
