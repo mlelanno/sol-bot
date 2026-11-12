@@ -205,48 +205,96 @@ async def get_market_data(session: aiohttp.ClientSession, mint: str, sol_spent: 
     }
 
 async def process_event(session: aiohttp.ClientSession, event: dict):
-    fee_payer = event.get("feePayer", "")
-    if not fee_payer or fee_payer not in WALLET_MAP:
-        return
-    swap = event.get("events", {}).get("swap", {})
-    if not swap:
-        return
-    sol_spent = 0.0
-    native_input = swap.get("nativeInput") or {}
-    if native_input.get("amount"):
-        sol_spent = float(native_input["amount"]) / 1e9
-    else:
-        for inp in swap.get("tokenInputs") or []:
-            if inp.get("mint") == "So11111111111111111111111111111111111111112":
-                raw = inp.get("rawTokenAmount") or {}
-                amt = float(raw.get("tokenAmount", 0))
-                dec = int(raw.get("decimals", 9))
-                sol_spent = amt / (10 ** dec)
-                break
-    if sol_spent < MIN_SOL_BUY:
-        return
-    bought_mint = None
-    tokens_received = 0.0
-    for out in swap.get("tokenOutputs") or []:
-        m = out.get("mint", "")
-        if m and m not in IGNORED_MINTS:
-            bought_mint = m
-            raw = out.get("rawTokenAmount") or {}
-            amt = float(raw.get("tokenAmount", 0))
-            dec = int(raw.get("decimals", 6))
-            tokens_received = amt / (10 ** dec) if amt > 0 else 0.0
+    # --- Étape 1 : Identifier le KOL (kol_wallet) parmi tous les acteurs de la transaction ---
+    candidates = []
+    
+    # feePayer
+    fee_payer = event.get("feePayer")
+    if fee_payer:
+        candidates.append(fee_payer)
+    
+    # tokenTransfers
+    transfers = event.get("tokenTransfers") or []
+    for t in transfers:
+        candidates.append(t.get("fromUserAccount", ""))
+        candidates.append(t.get("toUserAccount", ""))
+    
+    # nativeTransfers
+    native_transfers = event.get("nativeTransfers") or []
+    for n in native_transfers:
+        candidates.append(n.get("fromUserAccount", ""))
+        candidates.append(n.get("toUserAccount", ""))
+    
+    # accountData
+    account_data = event.get("accountData") or []
+    for a in account_data:
+        candidates.append(a.get("account", ""))
+    
+    # Sélectionne la première adresse présente dans WALLET_MAP comme kol_wallet
+    kol_wallet = None
+    for candidate in candidates:
+        if candidate and candidate in WALLET_MAP:
+            kol_wallet = candidate
             break
-    if not bought_mint:
+    
+    if not kol_wallet or kol_wallet not in WALLET_MAP:
         return
     
-    now = time.time()
-    # Vérification stricte : feePayer doit EXISTER dans WALLET_MAP pour être comptabilisé
-    if not fee_payer or fee_payer not in WALLET_MAP:
+    # --- Étape 2 : Extraire le swap avec fallback PumpSwap obligatoire ---
+    sol_spent = 0.0
+    bought_mint = None
+    tokens_received = 0.0
+    
+    # Tenter d'abord l'extraction depuis events.swap (cas standard)
+    swap = event.get("events", {}).get("swap", {})
+    if swap:
+        native_input = swap.get("nativeInput") or {}
+        if native_input.get("amount"):
+            sol_spent = float(native_input["amount"]) / 1e9
+        else:
+            for inp in swap.get("tokenInputs") or []:
+                if inp.get("mint") == "So11111111111111111111111111111111111111112":
+                    raw = inp.get("rawTokenAmount") or {}
+                    amt = float(raw.get("tokenAmount", 0))
+                    dec = int(raw.get("decimals", 9))
+                    sol_spent = amt / (10 ** dec)
+                    break
+    
+    # Fallback si bought_mint est vide ou sol_spent <= 0 (cas PumpSwap)
+    if not bought_mint:
+        for t in transfers:
+            mint = t.get("mint", "")
+            from_acc = t.get("fromUserAccount", "")
+            to_acc = t.get("toUserAccount", "")
+            
+            # Si le KOL reçoit des tokens (achat) et que ce n'est pas un token ignoré
+            if to_acc == kol_wallet and mint not in IGNORED_MINTS:
+                bought_mint = mint
+                amt = float(t.get("tokenAmount", 0))
+                dec = int(t.get("decimals", 6))
+                tokens_received += amt / (10 ** dec) if amt > 0 else 0.0
+        
+        # Seulement si sol_spent <= 0, vérifier nativeTransfers pour SOL natif
+        # (pour éviter tout double comptage WSOL + SOL natif)
+        if sol_spent <= 0:
+            for n in native_transfers:
+                from_user = n.get("fromUserAccount", "")
+                if from_user == kol_wallet:
+                    amt = float(n.get("amount", 0)) or 0
+                    sol_spent += amt / 1e9
+    
+    # Appliquer le filtre MIN_SOL_BUY et la présence de bought_mint
+    if not bought_mint or sol_spent < MIN_SOL_BUY:
         return
-    info = WALLET_MAP[fee_payer]
-    clusters[bought_mint][fee_payer] = {"time": now, "sol": sol_spent, "tokens": tokens_received}
+    
+    # --- Étape 3 : Enregistrer la position avec kol_wallet (et non fee_payer) ---
+    now = time.time()
+    
+    info = WALLET_MAP[kol_wallet]
+    clusters[bought_mint][kol_wallet] = {"time": now, "sol": sol_spent, "tokens": tokens_received}
     cleanup_clusters(bought_mint, now)
     count = len(clusters[bought_mint])
+    
     console.print(
         f"👀 [bold cyan]{info['name']} {info['emoji']}[/bold cyan] a acheté "
         f"[yellow]{sol_spent:.2f} SOL[/yellow] sur [green]{bought_mint[:6]}...{bought_mint[-4:]}[/green] "
@@ -285,15 +333,30 @@ async def process_event(session: aiohttp.ClientSession, event: dict):
 
 async def handle_webhook(request: web.Request):
     try:
-        raw_data = await request.json()
+        # --- Lecture sécurisée pour absorber les rafales sans crash réseau ---
+        raw_bytes = await request.read()
+        if not raw_bytes:
+            return web.Response(text="OK", status=200)
+        raw_data = json.loads(raw_bytes.decode("utf-8"))
+        
         events = raw_data if isinstance(raw_data, list) else [raw_data]
         session = request.app["http_session"]
+        
         for ev in events:
             if isinstance(ev, dict):
                 try:
                     await process_event(session, ev)
+                except (asyncio.CancelledError, ConnectionResetError):
+                    # Capture sans imprimer d'erreur dans les logs
+                    pass
                 except Exception as e:
                     console.print(f"[red]Erreur event : {e}[/red]")
+    except asyncio.CancelledError:
+        # Capture sans imprimer d'erreur dans les logs
+        return web.Response(text="OK", status=200)
+    except ConnectionResetError:
+        # Capture sans imprimer d'erreur dans les logs
+        return web.Response(text="OK", status=200)
     except Exception as e:
         console.print(f"[red]Erreur payload : {e}[/red]")
     return web.Response(text="OK", status=200)
