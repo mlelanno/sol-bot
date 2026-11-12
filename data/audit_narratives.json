@@ -538,5 +538,85 @@
         "sol_spent": 12.249148833
       }
     ]
+  },
+  "6hKyBfvP4z1LSXpiZcFZp9ZHWLnZip7eFaKtDV2vpump": {
+    "mint": "6hKyBfvP4z1LSXpiZcFZp9ZHWLnZip7eFaKtDV2vpump",
+    "ticker": "6hKyBf",
+    "discovered_at": 1794527186.0299437,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
+        "name": "Dvces",
+        "sol_spent": 0.198
+      },
+      {
+        "wallet": "Bi4rd5FH5bYEN8scZ7wevxNZyNmKHdaBcvewdPFxYdLt",
+        "name": "THEO",
+        "sol_spent": 3.0
+      }
+    ]
+  },
+  "2hegufAhiuJ9Mayawwt6e1PTxuxsm3bfH1e23iaH6JWw": {
+    "mint": "2hegufAhiuJ9Mayawwt6e1PTxuxsm3bfH1e23iaH6JWw",
+    "ticker": "2heguf",
+    "discovered_at": 1794527226.0659966,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "Dgehc8YMv6dHsiPJVoumvq4pSBkMVvrTgTUg7wdcYJPJ",
+        "name": "maghrrebi",
+        "sol_spent": 1.89262392
+      },
+      {
+        "wallet": "BBQ6yYPAad3wTN5e8jUshryB9eWorKUYftk6pftQZ4J9",
+        "name": "bbqdev",
+        "sol_spent": 0.65202841
+      }
+    ]
+  },
+  "F7d7hNQgwkYPJodUxpwavHjNnzBKHe2fW3r6qVa4pump": {
+    "mint": "F7d7hNQgwkYPJodUxpwavHjNnzBKHe2fW3r6qVa4pump",
+    "ticker": "F7d7hN",
+    "discovered_at": 1794527231.480956,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "99i9uVA7Q56bY22ajKKUfTZTgTeP5yCtVGsrG9J4pDYQ",
+        "name": "Zrool",
+        "sol_spent": 1.233955077
+      },
+      {
+        "wallet": "BEVnX9S5mY1EnbDpxWHDp7Wwue5QJngLtVjNQoZyyPGC",
+        "name": "cladzsol",
+        "sol_spent": 1.283837634
+      }
+    ]
+  },
+  "7zXYXbJ3zsXT7hwDjHE9ghtmDd7dBH4aXm25vBfwpump": {
+    "mint": "7zXYXbJ3zsXT7hwDjHE9ghtmDd7dBH4aXm25vBfwpump",
+    "ticker": "7zXYXb",
+    "discovered_at": 1794527253.4327989,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "6aXFYXbFob1ZKAEDCcqZnX2vooA3TgEqDoy5dAQbeWoV",
+        "name": "Flamesonsol",
+        "sol_spent": 1.214400001
+      },
+      {
+        "wallet": "FLGW5etibcTAwvj3aS5HGqqjwXgJ2tNRdSjibPaUrj84",
+        "name": "evqd3",
+        "sol_spent": 0.786950032
+      }
+    ]
   }
 }

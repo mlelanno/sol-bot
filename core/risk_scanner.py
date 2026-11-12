@@ -118,7 +118,46 @@ class RiskScanner:
             print(f"Erreur lors de la vérification de la distribution des holders pour {mint}: {e}")
             return True  # En cas d'erreur, on considère que c'est sûr
 
-    async def evaluate_token(self, mint: str) -> Dict[str, Any]:
+    async def check_ml_weights(self, mc_usd: float) -> tuple:
+        """
+        Lit les recommandations ML depuis data/ml_weights.json et valide
+        le bracket de Market Cap du token candidat.
+        Retourne (is_safe, reason_message).
+        """
+        weights_file = "/home/kilpi/trading_bot/data/ml_weights.json"
+        if not os.path.exists(weights_file):
+            return True, "Pas de data ML"
+
+        try:
+            with open(weights_file, "r") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, Exception):
+            return True, "Pas de data ML"
+
+        total_analyzed = data.get("total_analyzed_trades", 0)
+
+        # Déterminer le bracket
+        if mc_usd < 15000:
+            bracket = "Micro"
+        elif mc_usd <= 50000:
+            bracket = "Low"
+        else:
+            bracket = "Mid"
+
+        # Si pas assez de données, on passe
+        if total_analyzed < 5:
+            return True, f"Pas assez de data ML ({total_analyzed} trades analysés)"
+
+        bracket_stats = data.get("mc_brackets_stats", {}).get(bracket, {})
+        winrate = bracket_stats.get("winrate", 0.0)
+        avg_pnl_sol = bracket_stats.get("avg_pnl_sol", 0.0)
+
+        if winrate < 40.0 or avg_pnl_sol < 0:
+            return False, f"Rejet ML : Le bracket {bracket} a un winrate trop faible."
+
+        return True, f"Validation ML : Bracket {bracket} approuvé."
+
+    async def evaluate_token(self, mint: str, mc_usd: float = 0.0) -> Dict[str, Any]:
         """
         Appelle les vérifications précédentes et retourne un booléen is_safe
         et un dictionnaire reasons détaillant pourquoi le token a passé ou échoué.
@@ -129,19 +168,18 @@ class RiskScanner:
         # Vérifier la distribution des holders
         holders_ok = await self.check_holder_distribution(mint)
 
-        if authorities_ok and holders_ok:
-            return {
-                "is_safe": True,
-                "reasons": {
-                    "authorities": "Revoked (Mint Authority et Freeze Authority sont None)",
-                    "holder_distribution": "Top 10 (hors Raydium/Pump.fun) ne contrôle pas plus de 25% de la supply",
-                },
-            }
-        else:
-            return {
-                "is_safe": False,
-                "reasons": {
-                    "authorities": "Non revocées (Mint Authority ou Freeze Authority présents)",
-                    "holder_distribution": "Le top 10 contrôle plus de 25% de la supply",
-                },
-            }
+        # Vérifier les poids ML
+        ml_safe, ml_reason = await self.check_ml_weights(mc_usd)
+
+        is_safe = authorities_ok and holders_ok and ml_safe
+
+        reasons = {
+            "authorities": "Revoked (Mint Authority et Freeze Authority sont None)" if authorities_ok else "Non revocées (Mint Authority ou Freeze Authority présents)",
+            "holder_distribution": "Top 10 (hors Raydium/Pump.fun) ne contrôle pas plus de 25% de la supply" if holders_ok else "Le top 10 contrôle plus de 25% de la supply",
+            "ml_validation": ml_reason,
+        }
+
+        return {
+            "is_safe": is_safe,
+            "reasons": reasons,
+        }

@@ -66,7 +66,7 @@ async def process_event(session, event):
         mc_usd = kol_price_usd * 1_000_000_000
 
         # Filtre anti-rug via RiskScanner
-        is_safe, reasons = await risk_scanner.evaluate_token(mint)
+        is_safe, reasons = await risk_scanner.evaluate_token(mint, mc_usd=mc_usd)
         if not is_safe:
             print(f"[RISQUE] Token rejeté : {reasons}")
             return
