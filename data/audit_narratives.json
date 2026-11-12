@@ -618,5 +618,25 @@
         "sol_spent": 0.786950032
       }
     ]
+  },
+  "Aerzt1UbAbJ5aTTHVvZkDpWVfwjb59WpuMynAEcwpump": {
+    "mint": "Aerzt1UbAbJ5aTTHVvZkDpWVfwjb59WpuMynAEcwpump",
+    "ticker": "Aerzt1",
+    "discovered_at": 1794527256.4228387,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "CyaE1VxvBrahnPWkqm5VsdCvyS2QmNht2UFrKJHga54o",
+        "name": "Cented",
+        "sol_spent": 0.2475
+      },
+      {
+        "wallet": "719sfKUjiMThumTt2u39VMGn612BZyCcwbM5Pe8SqFYz",
+        "name": "Fashr",
+        "sol_spent": 2.9699999999999998
+      }
+    ]
   }
 }
