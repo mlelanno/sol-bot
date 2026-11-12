@@ -3,3 +3,5 @@ RÈGLES D'EXÉCUTION STRICTES :
 2. Toute commande lancée via `execute_command` doit se terminer en moins de 5 secondes et rendre immédiatement la main au shell (exit code 0).
 3. Pour lancer un service persistant (listener, position_manager), utilise toujours :
    `nohup python3 -u <script.py> > logs/<nom>.log 2>&1 & sleep 1`
+4. AUTO-PUSH GITHUB OBLIGATOIRE : À la toute fin de chaque tâche, juste avant de conclure, exécute cette commande exacte via `execute_command` pour sauvegarder tes modifications sur GitHub :
+   `unset GIT_ASKPASS VSCODE_GIT_ASKPASS_NODE VSCODE_GIT_ASKPASS_MAIN && if [ -n "$(git status --porcelain)" ]; then git add -A && git commit -m "chore(cline): auto-update" && git push origin main; else echo "Aucun fichier modifié"; fi`
