@@ -378,5 +378,165 @@
         "sol_spent": 2.97
       }
     ]
+  },
+  "DzJ2zo62XcjBkcJaAvgPAnzeZ95SbUSFwEfgFzZuDR7": {
+    "mint": "DzJ2zo62XcjBkcJaAvgPAnzeZ95SbUSFwEfgFzZuDR7",
+    "ticker": "SATOSHIBA",
+    "discovered_at": 1794526628.2400918,
+    "dex_price": 3.014e-05,
+    "dex_mc": 30143.0,
+    "dex_liq": 15165.58,
+    "kols": [
+      {
+        "wallet": "AqsW2qxwaKKntSVKQKYBiyBjjR6UURGkWXzECTvQk116",
+        "name": "z11",
+        "sol_spent": 5.0
+      },
+      {
+        "wallet": "BCnqsPEtA1TkgednYEebRpkmwFRJDCjMQcKZMMtEdArc",
+        "name": "Kreo",
+        "sol_spent": 2.005137219
+      }
+    ]
+  },
+  "7YZWajPmkpVSNvbm3GBzFQeJjh4USY7LrbyoGgZxs75B": {
+    "mint": "7YZWajPmkpVSNvbm3GBzFQeJjh4USY7LrbyoGgZxs75B",
+    "ticker": "7YZWaj",
+    "discovered_at": 1794526739.7163732,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+        "name": "BWAM",
+        "sol_spent": 12.0
+      },
+      {
+        "wallet": "49fAsUF3Nk8qbfpSrQND2sULKXanemwibYLGk5Jpn9bY",
+        "name": "GodCallouts69",
+        "sol_spent": 2.441214789
+      }
+    ]
+  },
+  "7RBfCQrQCmYe3pUJVspvY6W8RuqUjFwcdGemHBYvThXC": {
+    "mint": "7RBfCQrQCmYe3pUJVspvY6W8RuqUjFwcdGemHBYvThXC",
+    "ticker": "7RBfCQ",
+    "discovered_at": 1794526819.047297,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "Cb4fr2USv9e9zp5dMSntKHZHsDZqUiHy2MCeERM2ckrr",
+        "name": "bullishhodler99",
+        "sol_spent": 1.98
+      },
+      {
+        "wallet": "4WbeDhRxyj9m8Uh7GZSNpW7DFh989oTFguTE4c2A2cgK",
+        "name": "miketrenches",
+        "sol_spent": 1.98
+      }
+    ]
+  },
+  "5Y6ABAfoEPuAqJYrbuxwZPWoAYxfj9PMngMQiqnngxGj": {
+    "mint": "5Y6ABAfoEPuAqJYrbuxwZPWoAYxfj9PMngMQiqnngxGj",
+    "ticker": "5Y6ABA",
+    "discovered_at": 1794526840.5448878,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+        "name": "BWAM",
+        "sol_spent": 5.0
+      },
+      {
+        "wallet": "8AtQ4ka3dgtrH1z4Uq3Tm4YdMN3cK5RRj1eKuGNnvenm",
+        "name": "peacefuldestroy",
+        "sol_spent": 0.99
+      }
+    ]
+  },
+  "4LG6cjCDXvVA4pCTbFeNotfv33ie73HtbKaJjMhQNGWh": {
+    "mint": "4LG6cjCDXvVA4pCTbFeNotfv33ie73HtbKaJjMhQNGWh",
+    "ticker": "4LG6cj",
+    "discovered_at": 1794526902.4631112,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+        "name": "BWAM",
+        "sol_spent": 6.0
+      },
+      {
+        "wallet": "4uCT4g7YHH4xxfmfNfKUDenwGrRNGoZ9Ay1XFxfUGhQG",
+        "name": "esee06257",
+        "sol_spent": 1.940914274
+      }
+    ]
+  },
+  "5GJogFAt3xm4DDHbr1xohNLBYXMRy7duW6fUqpdgiCaA": {
+    "mint": "5GJogFAt3xm4DDHbr1xohNLBYXMRy7duW6fUqpdgiCaA",
+    "ticker": "5GJogF",
+    "discovered_at": 1794526949.4829507,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+        "name": "BWAM",
+        "sol_spent": 6.0
+      },
+      {
+        "wallet": "5S9qzJhSooakBaA9qZT6vWtoSy8FvyfxJ4t1vXvEK9G7",
+        "name": "Thesis",
+        "sol_spent": 2.4997499999999997
+      }
+    ]
+  },
+  "G9QDpzq9hCByi2LeWwNXbeiM73HhSstAhMe9WexrmrSF": {
+    "mint": "G9QDpzq9hCByi2LeWwNXbeiM73HhSstAhMe9WexrmrSF",
+    "ticker": "G9QDpz",
+    "discovered_at": 1794526968.1084151,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "Bi4rd5FH5bYEN8scZ7wevxNZyNmKHdaBcvewdPFxYdLt",
+        "name": "THEO",
+        "sol_spent": 0.26
+      },
+      {
+        "wallet": "ardinRsN1mNYVeoJWTBsWeYeXvuR9UUDGMsCDKpb6AT",
+        "name": "trunoest",
+        "sol_spent": 1.98
+      }
+    ]
+  },
+  "GgeWgeVTyVQVCK6KA8dJYiSqxDVio8puqiuVyFfpumps": {
+    "mint": "GgeWgeVTyVQVCK6KA8dJYiSqxDVio8puqiuVyFfpumps",
+    "ticker": "PUMPS",
+    "discovered_at": 1794527026.8168705,
+    "dex_price": 5.415e-05,
+    "dex_mc": 51105.0,
+    "dex_liq": 16316.31,
+    "kols": [
+      {
+        "wallet": "BBQ6yYPAad3wTN5e8jUshryB9eWorKUYftk6pftQZ4J9",
+        "name": "bbqdev",
+        "sol_spent": 1.01030668
+      },
+      {
+        "wallet": "5hAgYC8TJCcEZV7LTXAzkTrm7YL29YXyQQJPCNrG84zM",
+        "name": "schoen",
+        "sol_spent": 12.249148833
+      }
+    ]
   }
 }
