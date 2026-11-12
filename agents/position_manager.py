@@ -258,6 +258,11 @@ async def process_position(mint_address: str, current_price: float) -> dict | No
     # Sauvegarder le trade
     append_trade(trade_record)
     
+    # Retirer la position du dictionnaire si elle est totalement vendue (STOP_LOSS ou TAKE_PROFIT_2)
+    # pour éviter la boucle infinie de ré-écriture des positions terminées
+    if action_type in ["STOP_LOSS", "TAKE_PROFIT_2"]:
+        del positions[mint_address]
+    
     return trade_record
 
 

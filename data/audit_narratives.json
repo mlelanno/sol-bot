@@ -1,0 +1,382 @@
+{
+  "B8UdHfNmsDynF7kucmctNUURWuSPuHk4Moi8xnZopump": {
+    "mint": "B8UdHfNmsDynF7kucmctNUURWuSPuHk4Moi8xnZopump",
+    "ticker": "LSTR",
+    "discovered_at": 1794525625.1019516,
+    "dex_price": 3.155e-05,
+    "dex_mc": 31557.29,
+    "dex_liq": 0.0,
+    "kols": [
+      {
+        "wallet": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
+        "name": "Dvces",
+        "sol_spent": 0.198
+      },
+      {
+        "wallet": "6DQAGJT7VZPVBsuG4kn3AvpyHCEi7B2RFFvMZdbqQqqP",
+        "name": "cupsey",
+        "sol_spent": 0.99
+      }
+    ]
+  },
+  "ARMYxiiNbzToMCrhH6dNE5rb5oq2v8iGZUx6uHfcopQh": {
+    "mint": "ARMYxiiNbzToMCrhH6dNE5rb5oq2v8iGZUx6uHfcopQh",
+    "ticker": "ARMY",
+    "discovered_at": 1794525659.4287698,
+    "dex_price": 6.165e-05,
+    "dex_mc": 61656.0,
+    "dex_liq": 26333.41,
+    "kols": [
+      {
+        "wallet": "6xX7LudE5AqnTUc8dJJfzuarkSc6WMw7qRHgQXUdWauJ",
+        "name": "Weirdcoin quant",
+        "sol_spent": 1.634090793
+      },
+      {
+        "wallet": "BnfiHRDpHQ5yQevvwnzTmxtaB1Ek276fV5oTY9bi71EA",
+        "name": "mambatrades_",
+        "sol_spent": 1.485
+      }
+    ]
+  },
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
+    "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "ticker": "USDC",
+    "discovered_at": 1794525663.2723105,
+    "dex_price": 1.001,
+    "dex_mc": 7798333360.0,
+    "dex_liq": 2123687.44,
+    "kols": [
+      {
+        "wallet": "pXGQ6J2ziRCvmYSLTT55FASf2jSHeCD6gju5xka31yV",
+        "name": "daddychilllll",
+        "sol_spent": 1.527112304
+      },
+      {
+        "wallet": "E7pskdV9xCCMXtsu747tjjFEMq9Fwwnvwo6fApQWBwxP",
+        "name": "Thepennyflippe",
+        "sol_spent": 18.920827027999998
+      }
+    ]
+  },
+  "DpGJjAJby18bYEeKwrwfd4iZa85urN9xHqgpEvRxpump": {
+    "mint": "DpGJjAJby18bYEeKwrwfd4iZa85urN9xHqgpEvRxpump",
+    "ticker": "DpGJjA",
+    "discovered_at": 1794525829.150735,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "Bi4rd5FH5bYEN8scZ7wevxNZyNmKHdaBcvewdPFxYdLt",
+        "name": "THEO",
+        "sol_spent": 0.26
+      },
+      {
+        "wallet": "BBQ6yYPAad3wTN5e8jUshryB9eWorKUYftk6pftQZ4J9",
+        "name": "bbqdev",
+        "sol_spent": 0.608640744
+      }
+    ]
+  },
+  "EZyMpc1477jpZfRh8c8HrRzVFhwq7uKXxBT54cpepump": {
+    "mint": "EZyMpc1477jpZfRh8c8HrRzVFhwq7uKXxBT54cpepump",
+    "ticker": "Humpback",
+    "discovered_at": 1794525864.4358842,
+    "dex_price": 5.381e-05,
+    "dex_mc": 53751.0,
+    "dex_liq": 18832.44,
+    "kols": [
+      {
+        "wallet": "2VR13Sh1zxPjP2ufj94CkzigTT9kokBV2Ffu1PqVegRf",
+        "name": "EmoGuy",
+        "sol_spent": 0.236945105
+      },
+      {
+        "wallet": "FM1YCKED2KaqB8Uat8aB1nsffR1vezr7s6FAEieXJgke",
+        "name": "7honest6",
+        "sol_spent": 0.99
+      }
+    ]
+  },
+  "2BZSFoGHVxSfnuUuwrcgcBg5ZJ3VRRc4f7q9pL6ppump": {
+    "mint": "2BZSFoGHVxSfnuUuwrcgcBg5ZJ3VRRc4f7q9pL6ppump",
+    "ticker": "2BZSFo",
+    "discovered_at": 1794525906.2341616,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
+        "name": "Dvces",
+        "sol_spent": 4.2867
+      },
+      {
+        "wallet": "BBQ6yYPAad3wTN5e8jUshryB9eWorKUYftk6pftQZ4J9",
+        "name": "bbqdev",
+        "sol_spent": 0.546614074
+      }
+    ]
+  },
+  "9k3thvwNFrYQVcRexHTkewZKF2EiHrqKkPwndp5XFN7w": {
+    "mint": "9k3thvwNFrYQVcRexHTkewZKF2EiHrqKkPwndp5XFN7w",
+    "ticker": "9k3thv",
+    "discovered_at": 1794526074.380324,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "ardinRsN1mNYVeoJWTBsWeYeXvuR9UUDGMsCDKpb6AT",
+        "name": "trunoest",
+        "sol_spent": 1.98
+      },
+      {
+        "wallet": "GZVSEAajExLJEvACHHQcujBw7nJq98GWUEZtood9LM9b",
+        "name": "washy dev",
+        "sol_spent": 1.02084911
+      }
+    ]
+  },
+  "SATqS9DYpLQsM2z51P4QCoqJRHa5wboV4qjJerJRUSH": {
+    "mint": "SATqS9DYpLQsM2z51P4QCoqJRHa5wboV4qjJerJRUSH",
+    "ticker": "RUSH",
+    "discovered_at": 1794526091.517168,
+    "dex_price": 75.53,
+    "dex_mc": 3965648.0,
+    "dex_liq": 650086.94,
+    "kols": [
+      {
+        "wallet": "D9gQ6RhKEpnobPBUdWY5bPQt2p3zGk3iVz6ChpUi2ArA",
+        "name": "Washy",
+        "sol_spent": 8.04
+      },
+      {
+        "wallet": "AqsW2qxwaKKntSVKQKYBiyBjjR6UURGkWXzECTvQk116",
+        "name": "z11",
+        "sol_spent": 7.59
+      }
+    ]
+  },
+  "DDmGnuvroxVrb7CSyjYcezFU8gnAfhKasg4ZZezmpump": {
+    "mint": "DDmGnuvroxVrb7CSyjYcezFU8gnAfhKasg4ZZezmpump",
+    "ticker": "AMD",
+    "discovered_at": 1794526110.6865633,
+    "dex_price": 0.0005294,
+    "dex_mc": 508994.0,
+    "dex_liq": 94277.97,
+    "kols": [
+      {
+        "wallet": "34ZEH778zL8ctkLwxxERLX5ZnUu6MuFyX9CWrs8kucMw",
+        "name": "Groovy",
+        "sol_spent": 0.996
+      },
+      {
+        "wallet": "GVXndNAyARszNNYd1BYnscyYae6d7farHXw1yUDgu7ga",
+        "name": "greycrab94249",
+        "sol_spent": 1.98
+      }
+    ]
+  },
+  "E8gtRHpQQeYvonUfCkFgBNN5ACEJTGhJCzmJMknspump": {
+    "mint": "E8gtRHpQQeYvonUfCkFgBNN5ACEJTGhJCzmJMknspump",
+    "ticker": "E8gtRH",
+    "discovered_at": 1794526147.066656,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "6aXFYXbFob1ZKAEDCcqZnX2vooA3TgEqDoy5dAQbeWoV",
+        "name": "Flamesonsol",
+        "sol_spent": 0.1485
+      },
+      {
+        "wallet": "3gHrfi6t4xG2KEH4gga9HxLRYqws9iTKdkLG55NwaTZJ",
+        "name": "skarraog",
+        "sol_spent": 1.485
+      }
+    ]
+  },
+  "FCPk2D5izPoaFEQwcdtm1g6CDftDdsrcnfisLSFhpump": {
+    "mint": "FCPk2D5izPoaFEQwcdtm1g6CDftDdsrcnfisLSFhpump",
+    "ticker": "FCPk2D",
+    "discovered_at": 1794526203.531834,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "6aXFYXbFob1ZKAEDCcqZnX2vooA3TgEqDoy5dAQbeWoV",
+        "name": "Flamesonsol",
+        "sol_spent": 1.214400001
+      },
+      {
+        "wallet": "BEVnX9S5mY1EnbDpxWHDp7Wwue5QJngLtVjNQoZyyPGC",
+        "name": "cladzsol",
+        "sol_spent": 1.709723138
+      }
+    ]
+  },
+  "CLNxEKyBi3RJs1QfBd7wjDgWvNDCpzhqdrUCTBJtpump": {
+    "mint": "CLNxEKyBi3RJs1QfBd7wjDgWvNDCpzhqdrUCTBJtpump",
+    "ticker": "CLNxEK",
+    "discovered_at": 1794526247.6230717,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "7rzHb25KeVs1WeeSaRHTouJWiCiSJKkxE14DvYCNkw3k",
+        "name": "focusbuysmemes",
+        "sol_spent": 0.637368337
+      },
+      {
+        "wallet": "6TAHDM5Tod7dBTZdYQxzgJZKxxPfiNV9udPHMiUNumyK",
+        "name": "blueycryp",
+        "sol_spent": 1.98
+      }
+    ]
+  },
+  "FTu55MyigXns96jz4nTCDDiTCjYJjyrHSceCgG9Upump": {
+    "mint": "FTu55MyigXns96jz4nTCDDiTCjYJjyrHSceCgG9Upump",
+    "ticker": "FOOD",
+    "discovered_at": 1794526270.0496454,
+    "dex_price": 0.0001139,
+    "dex_mc": 113819.0,
+    "dex_liq": 25184.16,
+    "kols": [
+      {
+        "wallet": "EA4MXkyF8C2NzY8fw2acJPuarmoU271KRCCAYpLzMBJr",
+        "name": "naughtygrimace",
+        "sol_spent": 4.95
+      },
+      {
+        "wallet": "HZXdwRRw27kfpYtTqc7bMfrRgK3LSUaiKDFtqoEihik8",
+        "name": "acridtuna55943",
+        "sol_spent": 1.342223457
+      }
+    ]
+  },
+  "DZrcfQPf7iuemCp6EKzBTnFvNU6XkcoLiEHn94dspump": {
+    "mint": "DZrcfQPf7iuemCp6EKzBTnFvNU6XkcoLiEHn94dspump",
+    "ticker": "DZrcfQ",
+    "discovered_at": 1794526322.5295584,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "3gHrfi6t4xG2KEH4gga9HxLRYqws9iTKdkLG55NwaTZJ",
+        "name": "skarraog",
+        "sol_spent": 1.485
+      },
+      {
+        "wallet": "49fAsUF3Nk8qbfpSrQND2sULKXanemwibYLGk5Jpn9bY",
+        "name": "GodCallouts69",
+        "sol_spent": 2.441214789
+      }
+    ]
+  },
+  "9a13W5HdqE95g3YE8Dk9wCHPucrCH33h6BTfdFvRpump": {
+    "mint": "9a13W5HdqE95g3YE8Dk9wCHPucrCH33h6BTfdFvRpump",
+    "ticker": "plumber",
+    "discovered_at": 1794526422.8367062,
+    "dex_price": 0.0003194,
+    "dex_mc": 308863.0,
+    "dex_liq": 51334.72,
+    "kols": [
+      {
+        "wallet": "3gHrfi6t4xG2KEH4gga9HxLRYqws9iTKdkLG55NwaTZJ",
+        "name": "skarraog",
+        "sol_spent": 0.099
+      },
+      {
+        "wallet": "J9TYAsWWidbrcZybmLSfrLzryANf4CgJBLdvwdGuC8MB",
+        "name": "johnsoncooks",
+        "sol_spent": 0.099
+      }
+    ]
+  },
+  "1475N35qfXFhsE9H6zYpafU3y1DbDCnQXLfkaA2cpump": {
+    "mint": "1475N35qfXFhsE9H6zYpafU3y1DbDCnQXLfkaA2cpump",
+    "ticker": "WASTED",
+    "discovered_at": 1794526443.3351598,
+    "dex_price": 1.167e-05,
+    "dex_mc": 11674.99,
+    "dex_liq": 0.0,
+    "kols": [
+      {
+        "wallet": "xyzfhxfy8NhfeNG3Um3WaUvFXzNuHkrhrZMD8dsStB6",
+        "name": "Gasp",
+        "sol_spent": 2.97
+      },
+      {
+        "wallet": "4yo9CUuTBbds9NFhZd4MzPiZZkUvveXdTnAH8qMsE8ku",
+        "name": "gfree",
+        "sol_spent": 2.4255
+      }
+    ]
+  },
+  "8YUmvtHZBcZgEuZ2Ye8EvMnMWfxTNdckz6X7sxYvCUMi": {
+    "mint": "8YUmvtHZBcZgEuZ2Ye8EvMnMWfxTNdckz6X7sxYvCUMi",
+    "ticker": "8YUmvt",
+    "discovered_at": 1794526475.3943875,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "55msLm128tQdXLXCXLxd756H9SaCo7wPpdetEioe7D8d",
+        "name": "boxbox_32",
+        "sol_spent": 1.343697541
+      },
+      {
+        "wallet": "5QQ5Xi9iyY29th4bt5q9GEA1QFSVprMDk6FRadupE7Aj",
+        "name": "jaswal",
+        "sol_spent": 1.485
+      }
+    ]
+  },
+  "AMvmfyfQbnqVqTA98VxFUsk769R7WZtYNTZdjVfipump": {
+    "mint": "AMvmfyfQbnqVqTA98VxFUsk769R7WZtYNTZdjVfipump",
+    "ticker": "AMvmfy",
+    "discovered_at": 1794526547.6597662,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "B32QbbdDAyhvUQzjcaM5j6ZVKwjCxAwGH5Xgvb9SJqnC",
+        "name": "KADENOX1",
+        "sol_spent": 1.003427192
+      },
+      {
+        "wallet": "4yo9CUuTBbds9NFhZd4MzPiZZkUvveXdTnAH8qMsE8ku",
+        "name": "gfree",
+        "sol_spent": 1.2672
+      }
+    ]
+  },
+  "8tgPiZfkgHmYrVrDEwuUj2C1VsMjKCAqeKE8avnsK8bk": {
+    "mint": "8tgPiZfkgHmYrVrDEwuUj2C1VsMjKCAqeKE8avnsK8bk",
+    "ticker": "8tgPiZ",
+    "discovered_at": 1794526589.129598,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "6aXFYXbFob1ZKAEDCcqZnX2vooA3TgEqDoy5dAQbeWoV",
+        "name": "Flamesonsol",
+        "sol_spent": 1.214400001
+      },
+      {
+        "wallet": "xyzfhxfy8NhfeNG3Um3WaUvFXzNuHkrhrZMD8dsStB6",
+        "name": "Gasp",
+        "sol_spent": 2.97
+      }
+    ]
+  }
+}
