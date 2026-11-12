@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""Position Manager - Surveillance et exécution automatique des stops/take-profits."""
+
+import asyncio
+import json
+import os
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+try:
+    import aiohttp
+except ImportError:
+    print("[ERROR] pip install aiohttp")
+    sys.exit(1)
+
+BASE_DIR = "/home/kilpi/trading_bot"
+ACTIVE_POSITIONS_FILE = os.path.join(BASE_DIR, "data", "active_positions.json")
+PAPER_TRADES_FILE = os.path.join(BASE_DIR, "logs", "paper_trades.json")
+TELEGRAM_BOT_TOKEN_FILE = os.path.join(BASE_DIR, ".env")
+DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/tokens"
+
+
+def load_env() -> dict:
+    env_vars = {}
+    if os.path.exists(TELEGRAM_BOT_TOKEN_FILE):
+        with open(TELEGRAM_BOT_TOKEN_FILE, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    env_vars[key.strip()] = value.strip().strip('"\'')
+    return env_vars
+
+
+async def fetch_price(mint_address: str, session: aiohttp.ClientSession) -> float | None:
+    try:
+        url = f"{DEXSCREENER_API_URL}/{mint_address}"
+        async with session.get(url, timeout=4) as response:
+            if response.status == 200:
+                data = await response.json()
+                pairs = data.get("pairs", [])
+                if pairs and len(pairs) > 0:
+                    return float(pairs[0].get("priceUsd", 0))
+    except Exception as e:
+        print(f"[WARN] Erreur fetch prix pour {mint_address[:8]}... : {type(e).__name__}")
+    return None
+
+
+async def send_telegram(message: str) -> bool:
+    import urllib.parse
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
+    if not token or not channel_id:
+        return False
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data={"chat_id": channel_id, "text": message, "parse_mode": "HTML"}) as response:
+                return response.status == 200
+    except Exception:
+        pass
+    return False
+
+
+def load_positions() -> dict:
+    try:
+        with open(ACTIVE_POSITIONS_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_positions(positions: dict) -> bool:
+    try:
+        os.makedirs(os.path.dirname(ACTIVE_POSITIONS_FILE), exist_ok=True)
+        with open(ACTIVE_POSITIONS_FILE, "w") as f:
+            json.dump(positions, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"[ERROR] Sauvegarde échouée : {e}")
+        return False
+
+
+def append_trade(trade_record: dict) -> bool:
+    try:
+        os.makedirs(os.path.dirname(PAPER_TRADES_FILE), exist_ok=True)
+        with open(PAPER_TRADES_FILE, "r") as f:
+            trades = json.load(f)
+        trades.append(trade_record)
+        with open(PAPER_TRADES_FILE, "w") as f:
+            json.dump(trades, f, indent=2)
+    except Exception as e:
+        print(f"[ERROR] Ajout trade échoué : {e}")
+        return False
+
+
+async def process_position(mint_address: str, current_price: float) -> dict | None:
+    """Traite une position et retourne l'action entreprise ou None."""
+    positions = load_positions()
+    if mint_address not in positions:
+        return None
+
+    position = positions[mint_address]
+    entry_price = float(position.get("entry_price_usd", 0))
+    tokens_held = float(position.get("tokens_held", 0))
+    tp1_executed = bool(position.get("tp1_executed", False))
+
+    if entry_price <= 0:
+        return None
+
+    pnl_pct = ((current_price - entry_price) / entry_price) * 100
+    action_type = None
+    trade_record = None
+
+    # 1. Stop-Loss (-30%) : VENT 100% + suppression
+    if pnl_pct <= -30.0:
+        action_type = "STOP_LOSS"
+        tokens_to_sell = tokens_held
+        sell_sol = tokens_to_sell * current_price
+        trade_record = {
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S") + "+00:00",
+            "action": "SELL",
+            "reason": "STOP-LOSS (-30%)",
+            "mint": mint_address,
+            "current_price_usd": current_price,
+            "entry_price_usd": entry_price,
+            "pnl_pct": round(pnl_pct, 2),
+            "tokens_sold": round(tokens_to_sell, 6),
+            "sell_sol": round(sell_sol, 4)
+        }
+
+    # 2. Take-Profit 1 (+100%) si pas exécuté : VENT 50%
+    elif pnl_pct >= 100.0 and not tp1_executed:
+        action_type = "TAKE_PROFIT_1"
+        tokens_to_sell = tokens_held / 2.0
+        sell_sol = tokens_to_sell * current_price
+        new_tokens_held = tokens_held - tokens_to_sell
+        trade_record = {
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S") + "+00:00",
+            "action": "SELL_PARTIAL",
+            "reason": "TAKE-PROFIT 1 (+100%) - 50% vendus",
+            "mint": mint_address,
+            "current_price_usd": current_price,
+            "entry_price_usd": entry_price,
+            "pnl_pct": round(pnl_pct, 2),
+            "tokens_sold": round(tokens_to_sell, 6),
+            "sell_sol": round(sell_sol, 4)
+        }
+
+    # 3. Take-Profit 2 (+300%) : VENT 100% des restants
+    elif pnl_pct >= 300.0:
+        action_type = "TAKE_PROFIT_2"
+        tokens_to_sell = tokens_held
+        sell_sol = tokens_to_sell * current_price
+        trade_record = {
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S") + "+00:00",
+            "action": "SELL",
+            "reason": "TAKE-PROFIT 2 (+300%) - Clôture totale",
+            "mint": mint_address,
+            "current_price_usd": current_price,
+            "entry_price_usd": entry_price,
+            "pnl_pct": round(pnl_pct, 2),
+            "tokens_sold": round(tokens_to_sell, 6),
+            "sell_sol": round(sell_sol, 4)
+        }
+
+        if action_type:
+async def run_position_manager() -> None:
+    """Boucle asynchrone permanente toutes les 5 secondes."""
+    print("[INFO] 🚀 Position Manager démarré - Surveillance active...")
+    session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
+    check_interval = 5.0
+
+    try:
+        while True:
+            positions = load_positions()
+            if not positions or len(positions) == 0:
+                print("[INFO] Aucune position active - surveillance en attente...")
+                await asyncio.sleep(check_interval)
+                continue
+            print(f"[INFO] {len(positions)} position(s) active(s) à surveiller")
+            for mint_address, position in positions.items():
+                price = await fetch_price(mint_address, session)
+                if price is None:
+                    print(f"[WARN] Timeout après 4s - ignoring {mint_address[:8]}... pour ce cycle")
+                    continue
+                pnl_pct = ((price - float(position.get("entry_price_usd", 0))) / 
+                           float(position.get("entry_price_usd", 1))) * 100
+                await process_position(mint_address, price)
+            save_positions(positions)
+            elapsed = time.time() - time.monotonic_start() if hasattr(time, 'monotonic_start') else 0
+            await asyncio.sleep(check_interval - (elapsed % check_interval))
+
+    except KeyboardInterrupt:
+        print("[INFO] Position Manager arrêté par l'utilisateur")
+    except Exception as e:
+        print(f"[ERROR] Erreur critique : {type(e).__name__} - {e}")
+    finally:
+        if not session.closed:
+            await session.close()
+
+
+if __name__ == "__main__":
+    try:
+        load_env()
+        import time
+        time.monotonic_start = lambda: time.monotonic()
+        asyncio.run(run_position_manager())
+    except Exception as e:
+        print(f"[FATAL] Erreur fatale : {type(e).__name__} - {e}")
+        sys.exit(1)
+
+        with open(PAPER_TRADES_FILE, "w") as f:
+            json.dump(trades, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"[ERROR] Ajout trade échoué : {e}")
+        return False

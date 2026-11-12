@@ -1,0 +1,5 @@
+RÈGLES D'EXÉCUTION STRICTES :
+1. INTERDICTION d'utiliser `cat << EOF`, `echo >` ou Python dans `execute_command` pour créer ou modifier un fichier. Utilise EXCLUSIVEMENT `write_to_file` ou `replace_in_file`.
+2. Toute commande lancée via `execute_command` doit se terminer en moins de 5 secondes et rendre immédiatement la main au shell (exit code 0).
+3. Pour lancer un service persistant (listener, position_manager), utilise toujours :
+   `nohup python3 -u <script.py> > logs/<nom>.log 2>&1 & sleep 1`

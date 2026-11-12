@@ -1,0 +1,14 @@
+# Secrets et configuration locale
+.env
+.persist_state.json
+
+# Environnement Python et cache
+venv/
+__pycache__/
+*.py[cod]
+
+# Logs et état dynamique de paper trading
+logs/
+data/active_positions.json
+# Décommente la ligne ci-dessous si tu veux garder ta liste de 1898 wallets privée :
+# data/smart_wallets.json
