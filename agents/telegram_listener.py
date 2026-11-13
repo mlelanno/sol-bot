@@ -1,135 +1,259 @@
-import sys, os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
+import sys
+import os
 import asyncio
-import re
-import aiohttp
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
 
-from aiogram import Bot, Dispatcher, Router
-from aiogram.types import Message
+# 1. Ajoute la racine du projet au sys.path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import (
-    TELEGRAM_BOT_TOKEN,
-    TELEGRAM_CHANNEL_ID,
-    PUMP_MIN_VOLUME_USD,
-    PUMP_MIN_MARKET_CAP_USD
+# 2. Crée les dossiers data/ et logs/ s'ils n'existent pas
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.makedirs(os.path.join(BASE_DIR, "data"), exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, "logs"), exist_ok=True)
+
+# 3. Charge .env via load_dotenv()
+from dotenv import load_dotenv
+load_dotenv()
+
+# Lecture des variables d'environnement
+TG_API_ID = os.getenv("TG_API_ID")
+TG_API_HASH = os.getenv("TG_API_HASH")
+TG_CHANNELS_RAW = os.getenv("TG_CHANNELS", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+
+# Vérification des prérequis
+if not all([TG_API_ID, TG_API_HASH, TG_CHANNELS_RAW]):
+    print("⚠️  Variables d'environnement manquantes : TG_API_ID, TG_API_HASH, TG_CHANNELS")
+    print("   Veuillez compléter .env.example et redémarr le bot.")
+    sys.exit(0)
+
+# 4. Parse TG_CHANNELS intelligemment
+TG_CHANNELS = []
+for entry in TG_CHANNELS_RAW.split(","):
+    entry = entry.strip()
+    if entry and (entry.isdigit() or (entry.startswith("-") and entry[1:].isdigit())):
+        TG_CHANNELS.append(int(entry))
+    else:
+        TG_CHANNELS.append(entry)
+
+# 5. Stocke la session dans data/telethon_session
+SESSION_FILE = os.path.join(BASE_DIR, "data", "telethon_session")
+
+# Configuration du logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(BASE_DIR, "logs", "telegram_listener.log")),
+        logging.StreamHandler(),
+    ],
 )
-from core.power import is_gpu_ready, wake_gpu_server
-from core.paper_engine import paper_engine
+logger = logging.getLogger("telegram_listener")
 
-console = Console()
-router = Router()
-bot = Bot(token=TELEGRAM_BOT_TOKEN)
-dp = Dispatcher()
-dp.include_router(router)
+# Import Telethon aprè sconfiguration
+from telethon import TelegramClient, events
 
-SOLANA_CONTRACT_REGEX = re.compile(r"\b[1-9A-HJ-NP-za-km-z]{32,44}\b")
-TICKER_REGEX = re.compile(r"\$([A-Za-z0-9_]+)")
+# Configuration Gemini
+GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
-def is_target_channel(message: Message) -> bool:
-    return str(message.chat.id) == str(TELEGRAM_CHANNEL_ID)
+# Configuration OpenRouter
+OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
 
-async def check_dexscreener_metrics(contract_address: str):
-    url = f"https://api.dexscreener.com/latest/dex/tokens/{contract_address}"
+# Buffer de messages (max 50)
+message_buffer = []
+buffer_lock = asyncio.Lock()
+
+# Chargement/chargement du fichier narrative_signals.json
+NARRATIVE_FILE = os.path.join(BASE_DIR, "data", "narrative_signals.json")
+
+
+def load_narrative_signals():
+    try:
+        with open(NARRATIVE_FILE, "r") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return data
+            return []
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def save_narrative_signals(signals):
+    now = datetime.now().timestamp()
+    filtered = [s for s in signals if now - s.get("timestamp", 0) <= 1800]
+    with open(NARRATIVE_FILE, "w") as f:
+        json.dump(filtered, f, indent=2)
+
+
+def add_narrative_signal(keywords, narrative_strength):
+    signals = load_narrative_signals()
+    signals.append({
+        "timestamp": datetime.now().isoformat(),
+        "keywords": keywords,
+        "narrative_strength": narrative_strength,
+        "is_organic": True,
+        "shill_pattern": False,
+    })
+    save_narrative_signals(signals)
+
+
+# Initialisation du client Telegram
+telegram_client = TelegramClient(
+    SESSION_FILE,
+    int(TG_API_ID),
+    TG_API_HASH,
+)
+
+# Configuration Gemini
+GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+
+# Configuration OpenRouter
+OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+
+# -------------------------------------------------------
+# Fonctions utilitaires d'analyse Gemini / OpenRouter
+# -------------------------------------------------------
+
+
+async def call_gemini(messages_text: str):
+    if not GEMINI_API_KEY:
+        return None
+    import aiohttp
+    url = f"{GEMINI_ENDPOINT}?key={GEMINI_API_KEY}"
+    payload = {
+        "contents": messages_text,
+        "generationConfig": {
+            "responseMimeType": "application/json",
+        },
+    }
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=5) as response:
-                if response.status != 200:
+            async with session.post(url, json=payload, timeout=15) as resp:
+                if resp.status != 200:
+                    logger.warning(f"Gemini HTTP {resp.status}")
                     return None
-                data = await response.json()
-                pairs = data.get("pairs")
-                if not pairs:
-                    return None
-                pair = pairs[0]
-                return {
-                    "price_usd": float(pair.get("priceUsd", 0) or 0),
-                    "volume_usd": float(pair.get("volume", {}).get("h24", 0) or 0),
-                    "market_cap": float(pair.get("fdv", 0) or pair.get("marketCap", 0) or 0)
-                }
+                data = await resp.json()
+        text = data.get("text", "")
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start == -1 or end <= start:
+            logger.warning("Pas de JSON trouvé dans la réponse Gemini")
+            return None
+        result = json.loads(text[start:end])
+        required = {"external_catalyst", "shill_pattern_detected", "keywords", "narrative_strength"}
+        if not required.issubset(set(result.keys())):
+            logger.warning(f"Champs manquants dans le JSON Gemini : {result}")
+            return None
+        return result
     except Exception as e:
-        console.print(f"[bold red]Erreur Dexscreener : {e}[/bold red]")
+        logger.error(f"Erreur Gemini : {e}")
         return None
 
-async def inject_into_pipeline(contract_address: str, ticker: str = ""):
-    console.print(f"\n[cyan]🔍 Interrogation de Dexscreener pour {contract_address}...[/cyan]")
-    metrics = await check_dexscreener_metrics(contract_address)
 
-    if not metrics:
-        console.print(Panel(
-            f"[bold yellow]Contrat : {contract_address}\nAucune paire active trouvée sur Dexscreener (Token probablement trop récent ou non indexé).[/bold yellow]",
-            title="⚠️ FILTRE DEXSCREENER", border_style="yellow"
-        ))
+async def call_openrouter(messages_text: str):
+    if not OPENROUTER_API_KEY:
+        return None
+    import aiohttp
+    url = OPENROUTER_ENDPOINT
+    payload = {
+        "model": OPENROUTER_MODEL,
+        "messages": [{"role": "user", "content": messages_text}],
+        "response_format": {"type": "json_object"},
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, timeout=15) as resp:
+                if resp.status != 200:
+                    logger.warning(f"OpenRouter HTTP {resp.status}")
+                    return None
+                data = await resp.json()
+        choices = data.get("choices", [])
+        if not choices:
+            logger.warning("Pas de choices dans la réponse OpenRouter")
+            return None
+        text = choices[0].get("message", {}).get("content", "")
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start == -1 or end <= start:
+            logger.warning("Pas de JSON trouvé dans la réponse OpenRouter")
+            return None
+        result = json.loads(text[start:end])
+        required = {"external_catalyst", "shill_pattern_detected", "keywords", "narrative_strength"}
+        if not required.issubset(set(result.keys())):
+            logger.warning(f"Champs manquants dans le JSON OpenRouter : {result}")
+            return None
+        return result
+    except Exception as e:
+        logger.error(f"Erreur OpenRouter : {e}")
+        return None
+
+
+async def analyze_batch(buffer: list):
+    combined = "\n\n".join(buffer)
+    result = await call_gemini(combined)
+    if result is not None:
+        return result, "gemini"
+    result = await call_openrouter(combined)
+    if result is not None:
+        return result, "openrouter"
+    logger.warning("Échec de l'analyse : aucun provider disponible")
+    return None, None
+
+
+# Écoute Telegram
+@telegram_client.on(events.NewMessage(channels=True))
+async def handler(event):
+    global message_buffer
+    channel = event.chat_id
+    text = event.text or ""
+    channel_name = getattr(event.chat, "title", str(channel))
+    buffer_entry = f"[{channel_name}] {text}"
+    async with buffer_lock:
+        if len(message_buffer) >= 50:
+            message_buffer.pop(0)
+        message_buffer.append(buffer_entry)
+
+
+async def process_batch():
+    global message_buffer
+    async with buffer_lock:
+        if not message_buffer:
+            return
+        batch = list(message_buffer)
+        message_buffer.clear()
+    analysis, provider = await analyze_batch(batch)
+    if analysis is None:
+        logger.warning("Aucun résultat d'analyse")
         return
+    audit_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "provider": provider,
+        "result": analysis,
+    }
+    audit_path = os.path.join(BASE_DIR, "logs", "narrative_audit.jsonl")
+    with open(audit_path, "a") as f:
+        f.write(json.dumps(audit_entry) + "\n")
+    if (analysis.get("external_catalyst") and
+            not analysis.get("shill_pattern_detected") and
+            analysis.get("narrative_strength", 0) >= 50):
+        keywords = analysis.get("keywords", [])
+        strength = analysis.get("narrative_strength", 0)
+        add_narrative_signal(keywords, strength)
+    logger.info(f"Analyse terminée : provider={provider}, external_catalyst={analysis.get('external_catalyst')}")
 
-    mc = metrics["market_cap"]
-    vol = metrics["volume_usd"]
-    price = metrics["price_usd"]
 
-    table = Table(title="Métriques du Token")
-    table.add_column("Métrique", style="bold")
-    table.add_column("Valeur Réelle", style="yellow")
-    table.add_column("Critère Minimum", style="magenta")
-    table.add_row("Market Cap", f"${mc:,.2f}", f"${PUMP_MIN_MARKET_CAP_USD:,.2f}")
-    table.add_row("Volume", f"${vol:,.2f}", f"${PUMP_MIN_VOLUME_USD:,.2f}")
-    console.print(table)
-
-    if mc < PUMP_MIN_MARKET_CAP_USD or vol < PUMP_MIN_VOLUME_USD:
-        console.print(f"[bold red]⛔ SKIP : Critères non atteints (MC: ${mc:.0f}, Vol: ${vol:.0f})[/bold red]")
-        return
-
-    console.print(f"[bold green] Conditions validées ! Déclenchement du Paper Trade...[/bold green]")
-    success, trade = paper_engine.execute_buy(
-        contract_address=contract_address,
-        ticker=ticker,
-        price_usd=price,
-        mc_usd=mc,
-        vol_usd=vol
-    )
-
-    if success:
-        console.print(Panel(
-            f"[bold green]ACHAT SIMULÉ EFFECTUÉ ![/bold green]\n"
-            f"Token : {ticker} ({contract_address})\n"
-            f"Montant : {trade['amount_sol']} SOL\n"
-            f"Prix exécuté : ${trade['executed_price_usd']:.8f} (Slippage: 15%)\n"
-            f"Solde restant : {trade['remaining_sol']} SOL",
-            title="💰 PAPER TRADING ENGINE", border_style="green"
-        ))
-    else:
-        console.print(f"[bold red]Erreur Paper Trading : {trade}[/bold red]")
-
-@router.channel_post(is_target_channel)
-async def handle_channel_post(message: Message):
-    text = message.text or message.caption or ""
-    contracts = SOLANA_CONTRACT_REGEX.findall(text)
-    tickers = TICKER_REGEX.findall(text)
-
-    if not contracts:
-        return
-
-    ca = contracts[0]
-    ticker = f"${tickers[0]}" if tickers else "$UNKNOWN"
-
-    gpu_online = await is_gpu_ready()
-    status_gpu = "[bold green]EN LIGNE[/bold green]" if gpu_online else "[bold yellow]WOL ENVOYÉ[/bold yellow]"
-    if not gpu_online:
-        wake_gpu_server()
-
-    console.print(Panel(
-        f"Contrat Solana : [bold yellow]{ca}[/bold yellow]\n"
-        f"Ticker Détecté : [bold cyan]{ticker}[/bold cyan]\n"
-        f"Statut GPU     : {status_gpu}",
-        title="🚨 SENTINELLE TELEGRAM", border_style="red"
-    ))
-
-    await inject_into_pipeline(ca, ticker)
-
+# Lancement
 async def main():
-    console.print(f"[bold green]🚀 Sentinelle en écoute sur le canal {TELEGRAM_CHANNEL_ID}...[/bold green]")
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    await telegram_client.start()
+    logger.info("✅ Client Telegram connecté")
+    await telegram_client(handler)
+    logger.info("🛰️  Début écoute des canaux Telegram toutes les 3 min")
+    while True:
+        await asyncio.sleep(180)
+        await process_batch()

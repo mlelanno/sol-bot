@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+aiohttp
+python-telegram-bot
+python-dotenv
+telethon
+google-generativeai

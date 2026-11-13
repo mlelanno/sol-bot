@@ -818,5 +818,35 @@
         "sol_spent": 0.2079
       }
     ]
+  },
+  "TTWofwAge91oFhZs7kpQdyrVRkmevgM88xijGvQFbKo": {
+    "mint": "TTWofwAge91oFhZs7kpQdyrVRkmevgM88xijGvQFbKo",
+    "ticker": "PUMP_TTWo",
+    "discovered_at": 1794589328.684419,
+    "kol_price_sol": 2.8878121006528543,
+    "kol_price_usd": 490.9280571109852,
+    "mc_usd": 490928057110.9852,
+    "kols": [
+      {
+        "wallet": "FqamE7xrahg7FEWoByrx1o8SeyHt44rpmE6ZQfT7zrve",
+        "name": "???",
+        "sol_spent": 0.0
+      },
+      {
+        "wallet": "89HbgWduLwoxcofWpmn1EiF9wEdpgkNDEyPjzZ72mkDi",
+        "name": "alxcooks",
+        "sol_spent": 0.0
+      },
+      {
+        "wallet": "9iaawVBEsFG35PSwd4PahwT8fYNQe9XYuRdWm872dUqY",
+        "name": "meechie",
+        "sol_spent": 0.0
+      },
+      {
+        "wallet": "29yFzeBZgxf5zqrAkKXwgZtQehRf4pL8WbV2nRJikbw8",
+        "name": "throatycrab1008",
+        "sol_spent": 8.02
+      }
+    ]
   }
 }
