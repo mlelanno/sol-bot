@@ -1,20 +1,23 @@
 {
-  "last_optimized": "2026-11-13T00:00:01.312931Z",
-  "total_analyzed_trades": 8,
-  "global_winrate_pct": 50.0,
+  "last_optimized": "2026-11-13T15:40:09.709637Z",
+  "total_analyzed_trades": 12,
+  "global_winrate_pct": 33.33,
   "best_mc_bracket": "Mid",
   "mc_brackets_stats": {
     "Micro": {
+      "count": 0,
       "winrate": 0.0,
       "avg_pnl_sol": 0.0
     },
     "Low": {
+      "count": 0,
       "winrate": 0.0,
       "avg_pnl_sol": 0.0
     },
     "Mid": {
-      "winrate": 50.0,
-      "avg_pnl_sol": 0.02275
+      "count": 12,
+      "winrate": 33.33,
+      "avg_pnl_sol": 0.014073
     }
   },
   "recommended_action": "Privil\u00e9giez les tokens \u00e0 forte capitalisation (Mid) pour des trades plus stables et mieux capitalis\u00e9s."

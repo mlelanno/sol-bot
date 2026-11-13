@@ -161,20 +161,24 @@ class RiskScanner:
 
     async def check_funding_clusters(self, mint: str, top_holders: list) -> bool:
         """
-        Détecte le bundling par financement : si 3 holders ou plus parmi les 8 plus
+        Détecte le bundling par financement : si 2 holders ou plus parmi les 4 plus
         gros holders (hors pools Raydium/Pump.fun) partagent exactement la même
         adresse funder externe, le token est rejeté.
 
-        Interroge RPC Solana (getSignaturesForAddress / getTransaction) avec un
-        timeout racine de 3 secondes. Ne bloque jamais l'exécution en cas de
-        latence ou d'erreur RPC.
+        Optimisé pour économiser le quota RPC Helius :
+        - Limite l'analyse aux 4 plus gros holders externes
+        - Utilise getSignaturesForAddress avec limit=100
+        - Prend la dernière signature (plus ancienne) pour retrouver le funder initial
+
+        Interroge RPC Solana avec un timeout racine de 3 secondes. Ne bloque jamais
+        l'exécution en cas de latence ou d'erreur RPC.
         """
-        if not top_holders or len(top_holders) < 3:
+        if not top_holders or len(top_holders) < 2:
             return True
 
         try:
             from_addr_map = {}
-            for holder in top_holders[:8]:
+            for holder in top_holders[:4]:
                 address = holder.get("address", "")
                 if not address:
                     continue
@@ -187,14 +191,17 @@ class RiskScanner:
                             "jsonrpc": "2.0",
                             "id": 1,
                             "method": "getSignaturesForAddress",
-                            "params": [address, {"limit": 1}],
+                            "params": [address, {"limit": 100}],
                         },
                         timeout=aiohttp.ClientTimeout(total=3),
                     )
                     data = sigs.json()
                     result = data.get("result", [])
                     if result and isinstance(result, list) and len(result) > 0:
-                        tx_sig = result[0].get("transactionSignature", "")
+                        # Solana renvoie du plus récent au plus ancien : prendre la dernière
+                        signatures = result
+                        oldest_sig = signatures[-1]
+                        tx_sig = oldest_sig.get("transactionSignature", "")
                         if tx_sig:
                             tx = await asyncio.to_thread(
                                 self._http_post,
@@ -228,7 +235,7 @@ class RiskScanner:
                     funder_map.setdefault(funder_addr, []).append(holder_addr)
 
             for funder_addr, holders_list in funder_map.items():
-                if len(holders_list) >= 3:
+                if len(holders_list) >= 2:
                     return False, f"Bundling détecté : {len(holders_list)} top holders financés par le même wallet {funder_addr[:6]}..."
 
             return True

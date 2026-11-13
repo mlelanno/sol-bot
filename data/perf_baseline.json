@@ -1,0 +1,11 @@
+{
+  "total_trades": 33,
+  "winrate_pct": 15.15,
+  "avg_win_sol": 0.044255,
+  "avg_loss_sol": -0.024276,
+  "profit_factor": 0.3798,
+  "max_drawdown_sol": 1.9,
+  "max_drawdown_pct": 97.44,
+  "total_profit_sol": 0.221274,
+  "total_loss_sol": 0.582629
+}
