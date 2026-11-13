@@ -1,15 +1,18 @@
 import json
 import os
+import time
+import aiohttp
 from datetime import datetime
-
 
 TRADES_FILE = "/home/kilpi/trading_bot/logs/paper_trades.json"
 ACTIVE_POSITIONS_FILE = "/home/kilpi/trading_bot/data/active_positions.json"
 
+BASE_SOL = 2.0
+MIN_SOL_FOR_TRADE = 0.052
+
 
 class PaperTradingEngine:
     def __init__(self):
-        self.sol_balance = 2.0
         self.trade_size = 0.05
         self.slippage = 0.025
         self.fees_sol = 0.002
@@ -22,6 +25,27 @@ class PaperTradingEngine:
         if not os.path.exists(ACTIVE_POSITIONS_FILE):
             with open(ACTIVE_POSITIONS_FILE, "w") as f:
                 json.dump({}, f)
+
+    @property
+    def sol_balance(self) -> float:
+        return self._calculate_available_sol()
+
+    def _calculate_available_sol(self) -> float:
+        try:
+            with open(TRADES_FILE, "r") as f:
+                trades = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return BASE_SOL
+
+        total_pnl = 0.0
+        total_fees = 0.0
+        for t in trades:
+            if t.get("action") == "SELL":
+                total_pnl += t.get("pnl_sol", 0.0)
+            if "network_fees_sol" in t:
+                total_fees += t.get("network_fees_sol", 0.0)
+
+        return round(BASE_SOL + total_pnl - total_fees, 4)
 
     def _load_positions(self):
         try:
@@ -44,16 +68,21 @@ class PaperTradingEngine:
     ):
         """Exécute un achat avec vérification de solde, frais et slippage."""
 
+        # Anti-mitraillette : interdiction d'ouvrir une position déjà existante
+        positions = self._load_positions()
+        if contract_address in positions:
+            return False, "Position déjà ouverte"
+
+        # Recalcul dynamique du solde disponible depuis les trades réalisés
+        sol_balance = self.sol_balance
+
         # Vérification du solde: besoin de trade_size + fees
         required_sol = self.trade_size + self.fees_sol
-        if self.sol_balance < required_sol:
-            return False, f"Solde SOL insuffisant: besoin de {required_sol} SOL, disponible {round(self.sol_balance, 4)} SOL"
+        if sol_balance < required_sol:
+            return False, f"Solde SOL insuffisant: besoin de {required_sol} SOL, disponible {round(sol_balance, 4)} SOL"
 
         # Application du slippage à l'entrée (achat plus cher)
         price_with_slippage = price_usd * (1 + self.slippage)
-
-        # Déduction des frais et de la position du solde
-        self.sol_balance -= required_sol
 
         # Calcul des tokens achetés
         tokens_held = self.trade_size / price_usd
@@ -69,7 +98,7 @@ class PaperTradingEngine:
             "network_fees_sol": self.fees_sol,
             "market_cap": mc_usd,
             "volume_24h": vol_usd,
-            "remaining_sol": round(self.sol_balance, 4),
+            "remaining_sol": round(sol_balance - required_sol, 4),
         }
 
         # Enregistrement du trade
@@ -123,9 +152,6 @@ class PaperTradingEngine:
         # Valeur marchande des tokens vendus (après slippage)
         price_with_slippage = current_price_usd * (1 - self.slippage)
         sol_recovered = tokens_to_sell * price_with_slippage
-
-        # Ajout du SOL récupéré au balance (décrit des frais)
-        self.sol_balance += sol_recovered - self.fees_sol
 
         # Calcul du PnL
         pnl_sol = sol_recovered - self.fees_sol - (tokens_to_sell * entry_price)
@@ -183,4 +209,78 @@ class PaperTradingEngine:
         }
 
         return True, f"Succès : {details['sol_recovered']} SOL récupérés ({details['pnl_percent']:.2f}% de PnL)", details
+
+    async def _get_current_price_usd(self, contract_address: str) -> float:
+        """Récupère le prix actuel via DexScreener (requête simulée rapide)."""
+        url = f"https://api.dexscreener.com/latest/dex/tokens/{contract_address}"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        pairs = data.get("pairs", [])
+                        if pairs:
+                            price = float(pairs[0].get("priceUsd", 0) or 0)
+                            if price > 0:
+                                return price
+        except Exception:
+            pass
+        return 0.0
+
+    async def auto_manage_exits(self):
+        """Scanne les positions actives et applique les règles de sortie autonomes."""
+        positions = self._load_positions()
+        if not positions:
+            return
+
+        now = time.time()
+        two_hours = 2 * 60 * 60
+
+        for contract_address in list(positions.keys()):
+            position = positions[contract_address]
+            entry_price = position["entry_price_usd"]
+            entry_timestamp = position.get("entry_timestamp", now)
+            tp1_executed = position.get("tp1_executed", False)
+
+            current_price = await self._get_current_price_usd(contract_address)
+            if current_price <= 0:
+                continue
+
+            pnl_percent = ((current_price / entry_price) - 1) * 100
+
+            # 1. HARD STOP-LOSS : -30% ou plus
+            if pnl_percent <= -30.0:
+                await self.execute_sell(
+                    contract_address=contract_address,
+                    ratio_to_sell=1.0,
+                    current_price_usd=current_price,
+                    reason="STOP-LOSS (-30%)",
+                )
+                continue
+
+            # 2. TAKE-PROFIT MOONBAG : +100% (x2) -> vendre 50%, marquer "Risk Free"
+            if pnl_percent >= 100.0 and not tp1_executed:
+                await self.execute_sell(
+                    contract_address=contract_address,
+                    ratio_to_sell=0.5,
+                    current_price_usd=current_price,
+                    reason="TAKE-PROFIT MOONBAG (+100%)",
+                )
+                # Marquer comme Risk Free après le TP1
+                positions = self._load_positions()
+                if contract_address in positions:
+                    positions[contract_address]["tp1_executed"] = True
+                    positions[contract_address]["risk_free"] = True
+                    self._save_positions(positions)
+                continue
+
+            # 3. TIME-STOP : plus de 2 heures et PnL négatif
+            if (now - entry_timestamp) > two_hours and pnl_percent < 0:
+                await self.execute_sell(
+                    contract_address=contract_address,
+                    ratio_to_sell=1.0,
+                    current_price_usd=current_price,
+                    reason="TIME-STOP (2h, PnL négatif)",
+                )
+                continue
 

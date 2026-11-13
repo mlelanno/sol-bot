@@ -111,7 +111,22 @@ async def init_app():
     app = web.Application()
     app["session"] = aiohttp.ClientSession()
     app.router.add_post("/webhook", handle_webhook)
+    app.on_startup.append(start_auto_exit)
     return app
+
+
+async def auto_exit_loop():
+    while True:
+        try:
+            await paper_engine.auto_manage_exits()
+        except Exception as e:
+            print(f"[AUTO-EXIT] Erreur : {e}")
+        await asyncio.sleep(10)
+
+
+async def start_auto_exit(app):
+    asyncio.create_task(auto_exit_loop())
+
 
 if __name__ == "__main__":
     web.run_app(init_app(), host="0.0.0.0", port=5000)
