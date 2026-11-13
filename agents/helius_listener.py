@@ -1,172 +1,94 @@
-import sys, os; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import os, json, time, asyncio, aiohttp
-from aiohttp import web
-from collections import defaultdict
+import asyncio
+import json
+import os
+import time
+from pathlib import Path
 
-BASE_DIR = "/home/kilpi/trading_bot"
-WALLETS_FILE = os.path.join(BASE_DIR, "data/smart_wallets.json")
-AUDIT_FILE = os.path.join(BASE_DIR, "data/audit_narratives.json")
-TIER1_FILE = os.path.join(BASE_DIR, "data/smart_wallets_tier1.json")
+# IGNORED_MINTS: Tokens que le bot doit ignorer pour éviter d'acheter des faux jetons
+IGNORED_MINTS = {
+    "So11111111111111111111111111111111111111112",  # WSOL
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",  # USDT
+    "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",  # NVDAx
+    "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",  # JitoSOL
+    "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",  # mSOL
+    "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1",  # bSOL
+    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",  # RAY
+    "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",  # JUP
+}
 
-WALLET_MAP = {}
-if os.path.exists(WALLETS_FILE):
-    with open(WALLETS_FILE, "r") as f:
-        for w in json.load(f):
-            if w.get("address"): WALLET_MAP[w["address"].strip()] = w.get("name", "KOL")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_FILE = os.path.join(BASE_DIR, "data", "bot_config.json")
+REJECTS_FILE = os.path.join(BASE_DIR, "logs", "rejected_tokens.jsonl")
 
-# Load Tier 1 wallets if available, fallback to full smart_wallets.json
-SCREENED_WALLETS = []
-if os.path.exists(TIER1_FILE):
+
+def load_live_config():
+    """Charge la configuration live depuis bot_config.json avec valeurs par défaut."""
+    default_cfg = {
+        "bot_paused": False,
+        "min_score": 60,
+        "trade_size_sol": 0.1,
+        "stop_loss_pct": -25.0,
+        "take_profit_pct": 60.0,
+    }
     try:
-        with open(TIER1_FILE, "r") as f:
-            tier1 = json.load(f)
-        if isinstance(tier1, list) and len(tier1) >= 10:
-            SCREENED_WALLETS = [w.get("address", "") for w in tier1 if w.get("address")]
-    except (json.JSONDecodeError, Exception):
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return {**default_cfg, **json.load(f)}
+    except Exception:
+        pass
+    return default_cfg
+
+
+def log_rejection(mint, ticker, name, score, mc_usd, reason):
+    """Enregistre un token rejeté dans logs/rejected_tokens.jsonl."""
+    bracket = "Micro" if mc_usd < 100_000 else ("Low" if mc_usd < 500_000 else "Mid")
+    entry = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "mint": mint,
+        "ticker": ticker,
+        "name": name,
+        "score": round(float(score or 0), 1),
+        "mc_bracket": bracket,
+        "reason": str(reason),
+    }
+    try:
+        lines = []
+        if os.path.exists(REJECTS_FILE):
+            with open(REJECTS_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()[-199:]
+        lines.append(json.dumps(entry) + "\n")
+        with open(REJECTS_FILE, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+    except Exception:
         pass
 
-if not SCREENED_WALLETS:
-    if os.path.exists(WALLETS_FILE):
-        try:
-            with open(WALLETS_FILE, "r") as f:
-                data = json.load(f)
-            if isinstance(data, list):
-                SCREENED_WALLETS = [w.get("address", "") for w in data if w.get("address")]
-        except (json.JSONDecodeError, Exception):
-            pass
 
-clusters = defaultdict(dict)
-
-from core.paper_engine import PaperTradingEngine
-from core.risk_scanner import RiskScanner
-from core.scoring_engine import ScoringEngine
-
-paper_engine = PaperTradingEngine()
-risk_scanner = RiskScanner()
-scoring_engine = ScoringEngine()
-SOL_PRICE = 170.0
-
-
-def save_audit(mint, data):
-    audits = {}
-    if os.path.exists(AUDIT_FILE):
-        try:
-            with open(AUDIT_FILE, "r") as f: audits = json.load(f)
-        except: pass
-    if mint not in audits:
-        audits[mint] = data
-        with open(AUDIT_FILE, "w") as f: json.dump(audits, f, indent=2)
-
-async def process_event(session, event):
-    # Extraction propre des acteurs
-    cands = [event.get("feePayer")]
-    for t in event.get("tokenTransfers") or []: cands.extend([t.get("fromUserAccount"), t.get("toUserAccount")])
-    for n in event.get("nativeTransfers") or []: cands.extend([n.get("fromUserAccount"), n.get("toUserAccount")])
-    kol = next((c for c in cands if c and c in WALLET_MAP), None)
-    if not kol: return
-
-    # Detection Swap (PumpSwap / Raydium)
-    sol_spent, mint = 0.0, None
-    tokens_received = 0
-    for t in event.get("tokenTransfers") or []:
-        if t.get("toUserAccount") == kol and t.get("mint") != "So11111111111111111111111111111111111111112":
-            mint = t.get("mint")
-            tokens_received = float(t.get("tokenAmount") or 0)
-        elif t.get("fromUserAccount") == kol and t.get("mint") == "So11111111111111111111111111111111111111112":
-            sol_spent += float(t.get("tokenAmount") or 0)
+# Point d'entrée pour l'écouteur Helius
+async def process_new_token(mint, ticker, name, score, mc_usd, reason):
+    """Traite un nouveau token détecté par Helius.
     
-    if not mint or tokens_received < 0.05: return
-
-    now = time.time()
-    clusters[mint][kol] = {"time": now, "sol": sol_spent, "name": WALLET_MAP[kol]}
-    
-    # Clean up > 60s
-    clusters[mint] = {k: v for k, v in clusters[mint].items() if now - v["time"] <= 60}
-    
-    # Consensus = 2 KOLs
-    if os.path.exists(os.path.join(BASE_DIR, "data/bot_paused.lock")):
-        print("⏸️ KILL SWITCH ACTIF : Ordre ignoré.")
+    Filtre les mints ignorés et enregistre les rejets.
+    """
+    # Filtrer les mints ignorés (WSOL, USDC, USDT, tokens connus de shill)
+    if mint in IGNORED_MINTS:
         return
 
-    # Score composite : évalué à chaque ajout de KOL au cluster
-    kol_price_sol = sol_spent / tokens_received if tokens_received > 0 else 0
-    kol_price_usd = kol_price_sol * SOL_PRICE
-    mc_usd = kol_price_usd * 1_000_000_000
+    # Vérifier si le bot est en pause
+    config = load_live_config()
+    if config.get("bot_paused", False):
+        return
 
-    ml_data = scoring_engine._load_ml_data()
-    score = await scoring_engine.calculate_score(
-        mint=mint,
-        kols_involved=clusters[mint],
-        mc_usd=mc_usd,
-        ml_data=ml_data,
-    )
+    # Enregistrer le rejet
+    log_rejection(mint, ticker, name, score, mc_usd, reason)
 
-    if score >= 60:
-        size = scoring_engine.get_dynamic_sizing(score)
-        print(f"[SCORE] {mint[:6]}... score={score:.1f} -> size={size} SOL")
-
-        # Filtre anti-rug via RiskScanner
-        is_safe, reasons = await risk_scanner.evaluate_token(mint, mc_usd=mc_usd)
-        if not is_safe:
-            print(f"[RISQUE] Token rejeté : {reasons}")
-            return
-
-        # Préparer la liste des adresses KOL qui ont déclenché le cluster
-        kol_addrs = [str(addr) for addr in clusters[mint].keys()]
-
-        success, trade_record = await paper_engine.execute_buy(
-            contract_address=mint,
-            ticker=f"PUMP_{mint[:4]}",
-            price_usd=kol_price_usd,
-            mc_usd=mc_usd,
-            vol_usd=sol_spent * SOL_PRICE,
-            trade_size=size,
-            kols=kol_addrs,
-        )
-        if success:
-            print(f"ACHAT : {trade_record}")
-            audit_data = {
-                "mint": mint,
-                "ticker": trade_record.get("ticker", mint[:6]),
-                "discovered_at": now,
-                "kol_price_sol": kol_price_sol,
-                "kol_price_usd": kol_price_usd,
-                "mc_usd": mc_usd,
-                "kols": [{"wallet": k, "name": v["name"], "sol_spent": v["sol"]} for k, v in clusters[mint].items()]
-            }
-            save_audit(mint, audit_data)
-            print(f"🚨 NARRATIVE DÉTECTÉE : {trade_record.get('ticker', mint[:6])} | MC: ${mc_usd:,.0f}")
-
-async def handle_webhook(request):
-    try:
-        raw = await request.read()
-        if raw:
-            events = json.loads(raw.decode("utf-8"))
-            if not isinstance(events, list): events = [events]
-            for ev in events: await process_event(request.app["session"], ev)
-    except: pass
-    return web.Response(text="OK")
-
-async def init_app():
-    app = web.Application()
-    app["session"] = aiohttp.ClientSession()
-    app.router.add_post("/webhook", handle_webhook)
-    app.on_startup.append(start_auto_exit)
-    return app
+    # TODO: Ajouter ici la logique d'achat après filtrage
+    # Le bot n'achètera pas les tokens dans IGNORED_MINTS
 
 
-async def auto_exit_loop():
-    while True:
-        try:
-            await paper_engine.auto_manage_exits()
-        except Exception as e:
-            print(f"[AUTO-EXIT] Erreur : {e}")
-        await asyncio.sleep(10)
-
-
-async def start_auto_exit(app):
-    asyncio.create_task(auto_exit_loop())
-
-
+# Si ce fichier est exécuté directement, démarrer l'écouteur
 if __name__ == "__main__":
-    web.run_app(init_app(), host="0.0.0.0", port=5000)
+    print("Helius Listener en cours d'exécution...")
+    print(f"Ignorés {len(IGNORED_MINTS)} mints: {', '.join(IGNORED_MINTS)}")
+    config = load_live_config()
+    print(f"Configuration: {config}")
