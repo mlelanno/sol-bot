@@ -262,8 +262,13 @@ async def process_batch():
 async def main():
     await telegram_client.start()
     logger.info("✅ Client Telegram connecté")
-    await telegram_client(handler)
+    await telegram_client.get_dialogs()
+    logger.info(f"📡 Canaux surveillés : {TG_CHANNELS}")
     logger.info("🛰️  Début écoute des canaux Telegram toutes les 3 min")
     while True:
         await asyncio.sleep(180)
         await process_batch()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
