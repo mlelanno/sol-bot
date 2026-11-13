@@ -6,12 +6,34 @@ from collections import defaultdict
 BASE_DIR = "/home/kilpi/trading_bot"
 WALLETS_FILE = os.path.join(BASE_DIR, "data/smart_wallets.json")
 AUDIT_FILE = os.path.join(BASE_DIR, "data/audit_narratives.json")
+TIER1_FILE = os.path.join(BASE_DIR, "data/smart_wallets_tier1.json")
 
 WALLET_MAP = {}
 if os.path.exists(WALLETS_FILE):
     with open(WALLETS_FILE, "r") as f:
         for w in json.load(f):
             if w.get("address"): WALLET_MAP[w["address"].strip()] = w.get("name", "KOL")
+
+# Load Tier 1 wallets if available, fallback to full smart_wallets.json
+SCREENED_WALLETS = []
+if os.path.exists(TIER1_FILE):
+    try:
+        with open(TIER1_FILE, "r") as f:
+            tier1 = json.load(f)
+        if isinstance(tier1, list) and len(tier1) >= 10:
+            SCREENED_WALLETS = [w.get("address", "") for w in tier1 if w.get("address")]
+    except (json.JSONDecodeError, Exception):
+        pass
+
+if not SCREENED_WALLETS:
+    if os.path.exists(WALLETS_FILE):
+        try:
+            with open(WALLETS_FILE, "r") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                SCREENED_WALLETS = [w.get("address", "") for w in data if w.get("address")]
+        except (json.JSONDecodeError, Exception):
+            pass
 
 clusters = defaultdict(dict)
 
@@ -89,6 +111,9 @@ async def process_event(session, event):
             print(f"[RISQUE] Token rejeté : {reasons}")
             return
 
+        # Préparer la liste des adresses KOL qui ont déclenché le cluster
+        kol_addrs = [str(addr) for addr in clusters[mint].keys()]
+
         success, trade_record = await paper_engine.execute_buy(
             contract_address=mint,
             ticker=f"PUMP_{mint[:4]}",
@@ -96,6 +121,7 @@ async def process_event(session, event):
             mc_usd=mc_usd,
             vol_usd=sol_spent * SOL_PRICE,
             trade_size=size,
+            kols=kol_addrs,
         )
         if success:
             print(f"ACHAT : {trade_record}")

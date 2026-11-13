@@ -65,6 +65,7 @@ class PaperTradingEngine:
         mc_usd: float,
         vol_usd: float,
         trade_size: float = 0.05,
+        kols: list = None,
     ):
         """Exécute un achat avec vérification de solde, frais et slippage."""
 
@@ -99,6 +100,7 @@ class PaperTradingEngine:
             "market_cap": mc_usd,
             "volume_24h": vol_usd,
             "remaining_sol": round(sol_balance - required_sol, 4),
+            "kols": kols or [],
         }
 
         # Enregistrement du trade

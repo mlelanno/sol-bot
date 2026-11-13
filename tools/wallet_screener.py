@@ -39,12 +39,20 @@ class WalletScreener:
             if addr:
                 wallet_names[addr] = w.get("name", "Unknown")
 
-        # Build mint -> kols mapping from audit narratives
+        # Build mint -> kols mapping from BUY trades (primary source - KOL attribution)
         mint_to_kols = {}
-        for mint, data in audits.items():
-            kols = data.get("kols", [])
-            if kols:
-                mint_to_kols[mint] = kols
+        for trade in trades:
+            if trade.get("action") == "BUY" and "contract" in trade:
+                kols = trade.get("kols") or []
+                if kols:
+                    mint_to_kols[trade["contract"]] = kols
+
+        # Fallback to audit_narratives.json for older trades without BUY kols
+        if not mint_to_kols:
+            for mint, data in audits.items():
+                kols = data.get("kols", [])
+                if kols:
+                    mint_to_kols[mint] = kols
 
         # wallet -> list of trade results
         wallet_trades = defaultdict(list)

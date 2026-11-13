@@ -66,12 +66,16 @@ class MLOptimizer:
         for bracket in brackets:
             filtered = [s for s in sessions if s["bracket"] == bracket]
             if not filtered:
-                stats[bracket] = {"winrate": 0.0, "avg_pnl_sol": 0.0}
+                stats[bracket] = {"count": 0, "winrate": 0.0, "avg_pnl_sol": 0.0}
                 continue
             wins = [s for s in filtered if s["status"] == "Win"]
             winrate = (len(wins) / len(filtered)) * 100.0
             avg_pnl = sum(s["pnl_sol"] for s in filtered) / len(filtered)
-            stats[bracket] = {"winrate": round(winrate, 2), "avg_pnl_sol": round(avg_pnl, 6)}
+            stats[bracket] = {
+                "count": len(filtered),
+                "winrate": round(winrate, 2),
+                "avg_pnl_sol": round(avg_pnl, 6),
+            }
         return stats
 
     def determine_best_bracket(self, stats: Dict[str, Any]) -> str:
