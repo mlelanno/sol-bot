@@ -638,5 +638,165 @@
         "sol_spent": 2.9699999999999998
       }
     ]
+  },
+  "GWs5e15xdy593AXGwqEjDwBSt5qvz9FR24wsBDeEpump": {
+    "mint": "GWs5e15xdy593AXGwqEjDwBSt5qvz9FR24wsBDeEpump",
+    "ticker": "GWs5e1",
+    "discovered_at": 1794527321.732463,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "xyzfhxfy8NhfeNG3Um3WaUvFXzNuHkrhrZMD8dsStB6",
+        "name": "Gasp",
+        "sol_spent": 0.2475
+      },
+      {
+        "wallet": "6aXFYXbFob1ZKAEDCcqZnX2vooA3TgEqDoy5dAQbeWoV",
+        "name": "Flamesonsol",
+        "sol_spent": 1.214400001
+      }
+    ]
+  },
+  "Ca6TyrnZtTA3rF8tohdk7E3NSjASgPZ9r17qbHkqpump": {
+    "mint": "Ca6TyrnZtTA3rF8tohdk7E3NSjASgPZ9r17qbHkqpump",
+    "ticker": "Birry",
+    "discovered_at": 1794527396.2085035,
+    "dex_price": 0.0,
+    "dex_mc": 0.0,
+    "dex_liq": 0.0,
+    "kols": [
+      {
+        "wallet": "EgYa22bNrcQGRJny4rGJz8eJe5CSFKtXEqB9qPQQGN9p",
+        "name": "Uncquant",
+        "sol_spent": 1.359081871
+      },
+      {
+        "wallet": "5Y5nsbGfQSfTUSewkNfGUUrMe75ZdGqs8v5Nx5UX9Pge",
+        "name": "degen_lotus",
+        "sol_spent": 1.61091813
+      }
+    ]
+  },
+  "JhsL8KSfw7o1cbYemWNtNSTRBZhiBcJSu7VPHEEpump": {
+    "mint": "JhsL8KSfw7o1cbYemWNtNSTRBZhiBcJSu7VPHEEpump",
+    "ticker": "Food Inu",
+    "discovered_at": 1794527414.1793923,
+    "dex_price": 0.0,
+    "dex_mc": 0.0,
+    "dex_liq": 0.0,
+    "kols": [
+      {
+        "wallet": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6",
+        "name": "chairman",
+        "sol_spent": 0.612596759
+      },
+      {
+        "wallet": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+        "name": "Caps",
+        "sol_spent": 0.495
+      }
+    ]
+  },
+  "9LM1j6NYHdnEp87JqH9Gb8wbRcmKgx5m7dnntTXQBAGS": {
+    "mint": "9LM1j6NYHdnEp87JqH9Gb8wbRcmKgx5m7dnntTXQBAGS",
+    "ticker": "9LM1j6",
+    "discovered_at": 1794527470.2966783,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "5QQ5Xi9iyY29th4bt5q9GEA1QFSVprMDk6FRadupE7Aj",
+        "name": "jaswal",
+        "sol_spent": 1.485
+      },
+      {
+        "wallet": "3gHrfi6t4xG2KEH4gga9HxLRYqws9iTKdkLG55NwaTZJ",
+        "name": "skarraog",
+        "sol_spent": 1.485
+      }
+    ]
+  },
+  "FibMHnUpDLQGtg51rWZotvRX2yp45SewAU4KrCNcpump": {
+    "mint": "FibMHnUpDLQGtg51rWZotvRX2yp45SewAU4KrCNcpump",
+    "ticker": "42",
+    "discovered_at": 1794527609.4612985,
+    "dex_price": 1.297e-05,
+    "dex_mc": 12976.32,
+    "dex_liq": 0.0,
+    "kols": [
+      {
+        "wallet": "CgaA9a1JwAXJyfHuvZ7VW8YfTVRkdiT5mjBBSKcg7Rz5",
+        "name": "artcryptoz",
+        "sol_spent": 3.06527426
+      },
+      {
+        "wallet": "BBQ6yYPAad3wTN5e8jUshryB9eWorKUYftk6pftQZ4J9",
+        "name": "bbqdev",
+        "sol_spent": 1.067603372
+      }
+    ]
+  },
+  "BiuuAeRp44xaxRU64iDPhzsTGZPsw2xyAFhUVaFFpump": {
+    "mint": "BiuuAeRp44xaxRU64iDPhzsTGZPsw2xyAFhUVaFFpump",
+    "ticker": "BiuuAe",
+    "discovered_at": 1794527707.5622249,
+    "dex_price": 0,
+    "dex_mc": 0,
+    "dex_liq": 0,
+    "kols": [
+      {
+        "wallet": "6aXFYXbFob1ZKAEDCcqZnX2vooA3TgEqDoy5dAQbeWoV",
+        "name": "Flamesonsol",
+        "sol_spent": 3.96
+      },
+      {
+        "wallet": "B32QbbdDAyhvUQzjcaM5j6ZVKwjCxAwGH5Xgvb9SJqnC",
+        "name": "KADENOX1",
+        "sol_spent": 1.015817067
+      }
+    ]
+  },
+  "BiZev8AUeKT6nDyAJFTZwyn4oEh1BrGKNT83qBJvpump": {
+    "mint": "BiZev8AUeKT6nDyAJFTZwyn4oEh1BrGKNT83qBJvpump",
+    "ticker": "CHAIRMAN",
+    "discovered_at": 1794527795.4234977,
+    "dex_price": 0.0,
+    "dex_mc": 0.0,
+    "dex_liq": 0.0,
+    "kols": [
+      {
+        "wallet": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6",
+        "name": "chairman",
+        "sol_spent": 1.83678
+      },
+      {
+        "wallet": "BBQ6yYPAad3wTN5e8jUshryB9eWorKUYftk6pftQZ4J9",
+        "name": "bbqdev",
+        "sol_spent": 1.029639571
+      }
+    ]
+  },
+  "FU82YPmep6nDoqCu1HzsMGZwdyuLqVTGWoPtfrKbpump": {
+    "mint": "FU82YPmep6nDoqCu1HzsMGZwdyuLqVTGWoPtfrKbpump",
+    "ticker": "REVIVE",
+    "discovered_at": 1794527971.6187308,
+    "dex_price": 4.503e-05,
+    "dex_mc": 45035.0,
+    "dex_liq": 14839.18,
+    "kols": [
+      {
+        "wallet": "B9oKseVKRntTvfADyaUoH7oVmoyVbBfUf4NKyQc4KK2D",
+        "name": "fozzycapone",
+        "sol_spent": 2.97
+      },
+      {
+        "wallet": "5hAgYC8TJCcEZV7LTXAzkTrm7YL29YXyQQJPCNrG84zM",
+        "name": "schoen",
+        "sol_spent": 12.250281202
+      }
+    ]
   }
 }

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quant Control Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    body { background: #0b0e14; color: #e2e8f0; font-family: ui-monospace, monospace; }
+    .card { background: #131722; border: 1px solid #1e293b; }
+    .btn-primary { background: #10b981; color: #ffffff; }
+    .btn-primary:hover { background: #059669; }
+    .btn-danger { background: #ef4444; color: #ffffff; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-warn { background: #f59e0b; color: #ffffff; }
+    .btn-warn:hover { background: #d97706; }
+    .btn-outline { background: transparent; border: 1px solid #334155; color: #e2e8f0; }
+    .btn-outline:hover { background: #1e293b; }
+    .paused-overlay { background: rgba(239, 68, 68, 0.9); }
+  </style>
+</head>
+<body class="p-4 min-h-screen">
+  <div id="app" class="max-w-7xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="card p-6 rounded-xl border border-slate-700 shadow-lg">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+            <span>⚡</span> QUANT <span class="text-emerald-400">TERMINAL</span>
+          </h1>
+          <p class="text-slate-400 text-sm mt-1">Autonomous Paper-Trading Control Panel</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-right hidden md:block">
+            <div class="text-slate-400 text-xs">SOL BALANCE</div>
+            <div class="text-2xl font-bold text-sky-400" :class="{ 'text-rose-400': balance < 0.1 }">{{ balance.toFixed(4) }} SOL</div>
+          </div>
+          <button
+            @click="toggleBot"
+            :class="['px-6 py-3 rounded-lg font-bold text-white transition-all', paused ? 'btn-danger bg-rose-600 hover:bg-rose-700' : 'btn-outline']"
+          >
+            {{ paused ? '▶ REACTIVER' : '⏹ EMERGENCY STOP' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Status Bar -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="card p-4 rounded-lg">
+          <div class="text-xs text-slate-400 uppercase tracking-wider">PnL Total</div>
+          <div class="text-xl font-bold" :class="totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'">{{ totalPnl.toFixed(6) }} SOL</div>
+        </div>
+        <div class="card p-4 rounded-lg">
+          <div class="text-xs text-slate-400 uppercase tracking-wider">Winrate</div>
+          <div class="text-xl font-bold text-emerald-400">{{ winratePct.toFixed(1) }}%</div>
+        </div>
+        <div class="card p-4 rounded-lg">
+          <div class="text-xs text-slate-400 uppercase tracking-wider">Trades Complétés</div>
+          <div class="text-xl font-bold text-white">{{ completedTrades }}</div>
+        </div>
+        <div class="card p-4 rounded-lg">
+          <div class="text-xs text-slate-400 uppercase tracking-wider">Statut Bot</div>
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full" :class="paused ? 'bg-rose-500' : 'bg-emerald-500'"></span>
+            <span class="font-semibold" :class="paused ? 'text-rose-400' : 'text-emerald-400'">{{ paused ? 'PAUSÉ' : 'ACTIF' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ML Panel -->
+    <div class="card p-6 rounded-xl border border-slate-700">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold text-white">🧠 Machine Learning Override</h2>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" v-model="overrideML" class="rounded bg-slate-800 border-slate-600 text-emerald-500 focus:ring-emerald-500">
+          <label class="text-sm text-slate-300">Override ML Filter</label>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+          <div class="text-xs text-slate-400">Total Analysés</div>
+          <div class="text-lg font-bold text-white">{{ ml.total_analyzed_trades || 0 }}</div>
+        </div>
+        <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+          <div class="text-xs text-slate-400">Meilleur Bracket</div>
+          <div class="text-lg font-bold text-amber-400">{{ ml.best_mc_bracket || '—' }}</div>
+        </div>
+        <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+          <div class="text-xs text-slate-400">Recommandation IA</div>
+          <div class="text-sm font-semibold text-emerald-400 line-clamp-2">{{ ml.recommended_action || 'En attente...' }}</div>
+        </div>
+      </div>
+      <div class="mt-4 p-4 rounded-lg bg-slate-900/50 border border-slate-700">
+        <div class="text-xs text-slate-400 mb-2">Détail par Bracket</div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div v-for="(stats, bracket) in ml.mc_brackets_stats" :key="bracket" class="p-3 rounded bg-slate-800/30 border border-slate-700">
+            <div class="text-xs font-bold text-white">{{ bracket }}</div>
+            <div class="text-xs text-slate-400">Winrate: {{ stats.winrate }}%</div>
+            <div class="text-xs" :class="stats.avg_pnl_sol >= 0 ? 'text-emerald-400' : 'text-rose-400'">PnL: {{ stats.avg_pnl_sol }} SOL</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Positions -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2">
+        <div class="card p-6 rounded-xl border border-slate-700">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-white">📊 Positions Actives</h2>
+            <span class="text-xs text-slate-400 uppercase">{{ positions.length }} position{{ positions.length > 1 ? 's' : '' }}</span>
+          </div>
+          <div v-if="positions.length === 0" class="text-center py-8 text-slate-500">
+            Aucune position active.
+          </div>
+          <table v-else class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-700 text-slate-400 text-xs mb-2">
+                <th class="pb-2 font-bold">Token</th>
+                <th class="pb-2 font-bold text-right">Entrée</th>
+                <th class="pb-2 font-bold text-right">Tokens</th>
+                <th class="pb-2 font-bold text-right">Investi</th>
+                <th class="pb-2 font-bold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="pos in positions" :key="pos.mint" class="border-b border-slate-800 hover:bg-slate-800/30 transition">
+                <td class="py-3">
+                  <div class="font-bold text-white">{{ pos.ticker }}</div>
+                  <div class="text-xs text-slate-500">{{ pos.mint.substring(0, 8) }}...</div>
+                </td>
+                <td class="py-3 text-right text-slate-300">{{ pos.entry_price_usd.toFixed(8) }} USD</td>
+                <td class="py-3 text-right text-slate-300">{{ pos.tokens_held.toFixed(4) }}</td>
+                <td class="py-3 text-right text-slate-300">{{ pos.sol_invested.toFixed(4) }} SOL</td>
+                <td class="py-3 text-right">
+                  <button
+                    @click="forceSell(pos.mint, 0.5)"
+                    class="px-3 py-1.5 text-xs btn-warn rounded hover:bg-amber-600 transition"
+                  >Vendre 50%</button>
+                  <button
+                    @click="forceSell(pos.mint, 1.0)"
+                    class="ml-2 px-3 py-1.5 text-xs btn-danger rounded hover:bg-rose-600 transition"
+                  >Vendre 100%</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="lg:col-span-1">
+        <div class="card p-6 rounded-xl border border-slate-700">
+          <h2 class="text-lg font-bold text-white mb-4">📜 Historique</h2>
+          <div class="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+            <div v-for="(trade, idx) in history" :key="idx" class="p-3 rounded bg-slate-800/30 border border-slate-700">
+              <div class="flex justify-between items-start mb-1">
+                <span class="font-bold text-xs uppercase" :class="trade.action === 'BUY' ? 'text-sky-400' : 'text-rose-400'">{{ trade.action }}</span>
+                <span class="text-xs text-slate-500">{{ trade.ticker }}</span>
+              </div>
+              <div class="text-xs text-slate-300">
+                {{ trade.action === 'BUY' ? '-' + trade.amount_sol + ' SOL' : 'PnL: ' + trade.pnl_sol.toFixed(6) + ' SOL' }}
+              </div>
+              <div class="text-[10px] text-slate-500 mt-1">{{ trade.timestamp.substring(11, 19) }}</div>
+            </div>
+            <div v-if="history.length === 0" class="text-center py-4 text-slate-500 text-xs">Aucun historique.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, onMounted, onUnmounted } = Vue;
+
+    createApp({
+      setup() {
+        const balance = ref(2.0);
+        const totalPnl = ref(0);
+        const winratePct = ref(0);
+        const completedTrades = ref(0);
+        const paused = ref(false);
+        const positions = ref([]);
+        const history = ref([]);
+        const ml = ref({});
+        const overrideML = ref(false);
+        let intervalId = null;
+
+        async function fetchStats() {
+          try {
+            const res = await fetch('/api/stats');
+            const d = await res.json();
+            balance.value = d.balance || 2.0;
+            totalPnl.value = d.total_pnl_sol || 0;
+            winratePct.value = d.winrate_pct || 0;
+            completedTrades.value = d.completed_trades || 0;
+            paused.value = d.paused || false;
+            ml.value = d.ml || {};
+          } catch (e) {
+            console.error('Erreur fetch stats:', e);
+          }
+        }
+
+        async function fetchPositions() {
+          try {
+            const res = await fetch('/api/positions');
+            const d = await res.json();
+            positions.value = d.positions || [];
+          } catch (e) {
+            console.error('Erreur fetch positions:', e);
+          }
+        }
+
+        async function fetchHistory() {
+          try {
+            const res = await fetch('/api/stats');
+            const d = await res.json();
+            history.value = d.history || [];
+          } catch (e) {
+            console.error('Erreur fetch history:', e);
+          }
+        }
+
+        async function toggleBot() {
+          try {
+            const res = await fetch('/api/action/toggle_bot', { method: 'POST' });
+            const d = await res.json();
+            paused.value = d.paused;
+            alert('Bot ' + (d.paused ? 'PAUSÉ' : 'RÉACTIVÉ'));
+          } catch (e) {
+            console.error('Erreur toggle:', e);
+          }
+        }
+
+        async function forceSell(mint, ratio) {
+          if (!confirm('Voulez-vous vendre ' + (ratio * 100) + '% de cette position ?')) return;
+          try {
+            const res = await fetch('/api/action/force_sell', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mint, ratio })
+            });
+            const d = await res.json();
+            if (d.success) {
+              alert('Vente exécutée: ' + d.message);
+              await fetchPositions();
+              await fetchStats();
+            } else {
+              alert('Erreur: ' + d.error);
+            }
+          } catch (e) {
+            console.error('Erreur force_sell:', e);
+          }
+        }
+
+        onMounted(() => {
+          fetchStats();
+          fetchPositions();
+          fetchHistory();
+          intervalId = setInterval(() => {
+            fetchStats();
+            fetchPositions();
+            fetchHistory();
+          }, 5000);
+        });
+
+        onUnmounted(() => {
+          if (intervalId) clearInterval(intervalId);
+        });
+
+        return { balance, totalPnl, winratePct, completedTrades, paused, positions, history, ml, overrideML, toggleBot, forceSell };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
