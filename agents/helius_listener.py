@@ -1,3 +1,4 @@
+import sys, os; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import os, json, time, asyncio, aiohttp
 from aiohttp import web
 from collections import defaultdict
@@ -59,6 +60,10 @@ async def process_event(session, event):
     clusters[mint] = {k: v for k, v in clusters[mint].items() if now - v["time"] <= 60}
     
     # Consensus = 2 KOLs
+    if os.path.exists(os.path.join(BASE_DIR, "data/bot_paused.lock")):
+        print("⏸️ KILL SWITCH ACTIF : Ordre ignoré.")
+        return
+
     if len(clusters[mint]) >= 2:
         # Calcul du prix On-Chain
         kol_price_sol = sol_spent / tokens_received if tokens_received > 0 else 0

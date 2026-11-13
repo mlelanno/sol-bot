@@ -798,5 +798,25 @@
         "sol_spent": 12.250281202
       }
     ]
+  },
+  "AeG9jKBsFEdFaoshqTo5hnhppJC5935okDm9dDXGpump": {
+    "mint": "AeG9jKBsFEdFaoshqTo5hnhppJC5935okDm9dDXGpump",
+    "ticker": "PUMP_AeG9",
+    "discovered_at": 1794528216.347922,
+    "kol_price_sol": 3.2525759535168247e-07,
+    "kol_price_usd": 5.5293791209786017e-05,
+    "mc_usd": 55293.79120978602,
+    "kols": [
+      {
+        "wallet": "HPg7D2urG2B4z2BwKkS8z5HEwRRDKbtmYnAE31oCWzjL",
+        "name": "snv",
+        "sol_spent": 1.814282298
+      },
+      {
+        "wallet": "GgbCFRHHAPv5i1fqt1D1buf8FPNA31oKrkZvXDyZymsT",
+        "name": "losther",
+        "sol_spent": 0.2079
+      }
+    ]
   }
 }
