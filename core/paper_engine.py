@@ -13,7 +13,6 @@ MIN_SOL_FOR_TRADE = 0.052
 
 class PaperTradingEngine:
     def __init__(self):
-        self.trade_size = 0.05
         self.slippage = 0.025
         self.fees_sol = 0.002
         os.makedirs(os.path.dirname(TRADES_FILE), exist_ok=True)
@@ -65,6 +64,7 @@ class PaperTradingEngine:
         price_usd: float,
         mc_usd: float,
         vol_usd: float,
+        trade_size: float = 0.05,
     ):
         """Exécute un achat avec vérification de solde, frais et slippage."""
 
@@ -77,7 +77,7 @@ class PaperTradingEngine:
         sol_balance = self.sol_balance
 
         # Vérification du solde: besoin de trade_size + fees
-        required_sol = self.trade_size + self.fees_sol
+        required_sol = trade_size + self.fees_sol
         if sol_balance < required_sol:
             return False, f"Solde SOL insuffisant: besoin de {required_sol} SOL, disponible {round(sol_balance, 4)} SOL"
 
@@ -85,7 +85,7 @@ class PaperTradingEngine:
         price_with_slippage = price_usd * (1 + self.slippage)
 
         # Calcul des tokens achetés
-        tokens_held = self.trade_size / price_usd
+        tokens_held = trade_size / price_usd
 
         trade_record = {
             "timestamp": datetime.now().isoformat(),
@@ -94,7 +94,7 @@ class PaperTradingEngine:
             "contract": contract_address,
             "entry_price_usd": price_usd,
             "price_with_slippage": price_with_slippage,
-            "amount_sol": self.trade_size,
+            "amount_sol": trade_size,
             "network_fees_sol": self.fees_sol,
             "market_cap": mc_usd,
             "volume_24h": vol_usd,
@@ -114,7 +114,7 @@ class PaperTradingEngine:
             "ticker": ticker,
             "entry_price_usd": price_usd,
             "tokens_held": tokens_held,
-            "sol_invested": self.trade_size,
+            "sol_invested": trade_size,
             "entry_timestamp": datetime.now().timestamp(),
             "tp1_executed": False,
         }

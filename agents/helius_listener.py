@@ -17,9 +17,11 @@ clusters = defaultdict(dict)
 
 from core.paper_engine import PaperTradingEngine
 from core.risk_scanner import RiskScanner
+from core.scoring_engine import ScoringEngine
 
 paper_engine = PaperTradingEngine()
 risk_scanner = RiskScanner()
+scoring_engine = ScoringEngine()
 SOL_PRICE = 170.0
 
 
@@ -64,11 +66,22 @@ async def process_event(session, event):
         print("⏸️ KILL SWITCH ACTIF : Ordre ignoré.")
         return
 
-    if len(clusters[mint]) >= 2:
-        # Calcul du prix On-Chain
-        kol_price_sol = sol_spent / tokens_received if tokens_received > 0 else 0
-        kol_price_usd = kol_price_sol * SOL_PRICE
-        mc_usd = kol_price_usd * 1_000_000_000
+    # Score composite : évalué à chaque ajout de KOL au cluster
+    kol_price_sol = sol_spent / tokens_received if tokens_received > 0 else 0
+    kol_price_usd = kol_price_sol * SOL_PRICE
+    mc_usd = kol_price_usd * 1_000_000_000
+
+    ml_data = scoring_engine._load_ml_data()
+    score = await scoring_engine.calculate_score(
+        mint=mint,
+        kols_involved=clusters[mint],
+        mc_usd=mc_usd,
+        ml_data=ml_data,
+    )
+
+    if score >= 60:
+        size = scoring_engine.get_dynamic_sizing(score)
+        print(f"[SCORE] {mint[:6]}... score={score:.1f} -> size={size} SOL")
 
         # Filtre anti-rug via RiskScanner
         is_safe, reasons = await risk_scanner.evaluate_token(mint, mc_usd=mc_usd)
@@ -81,7 +94,8 @@ async def process_event(session, event):
             ticker=f"PUMP_{mint[:4]}",
             price_usd=kol_price_usd,
             mc_usd=mc_usd,
-            vol_usd=sol_spent * SOL_PRICE
+            vol_usd=sol_spent * SOL_PRICE,
+            trade_size=size,
         )
         if success:
             print(f"ACHAT : {trade_record}")
