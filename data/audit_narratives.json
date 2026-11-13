@@ -848,5 +848,70 @@
         "sol_spent": 8.02
       }
     ]
+  },
+  "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh": {
+    "mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+    "ticker": "PUMP_Xsc9",
+    "discovered_at": 1794603106.4967122,
+    "kol_price_sol": 2.0401700117364134,
+    "kol_price_usd": 346.8289019951903,
+    "mc_usd": 346828901995.1903,
+    "kols": [
+      {
+        "wallet": "7BVsMqCRoeEtvVeasYGrRhy83gHr5ZSJBnpV7QeCFQs4",
+        "name": "nevets7x",
+        "sol_spent": 0.0
+      },
+      {
+        "wallet": "GNrmKZCxYyNiSUsjduwwPJzhed3LATjciiKVuSGrsHEC",
+        "name": "Giann",
+        "sol_spent": 0.0
+      },
+      {
+        "wallet": "JAunzNqs3bVBcWDjDxfq9rgLzJMCadNXoaCgfzLGMtYs",
+        "name": "Penguzxbt",
+        "sol_spent": 0.0
+      },
+      {
+        "wallet": "8ZN71XTdVo8yRovnGLmNgW3Tgniw6A4J3JGLvPD686FP",
+        "name": "NateNateNateNat",
+        "sol_spent": 17.79
+      },
+      {
+        "wallet": "55msLm128tQdXLXCXLxd756H9SaCo7wPpdetEioe7D8d",
+        "name": "boxbox_32",
+        "sol_spent": 0.0
+      },
+      {
+        "wallet": "FFdBLYqL9rs5fUT38ArE8GV2L3BziEgG5LJUu6sshfkF",
+        "name": "alphaprophet",
+        "sol_spent": 12.46
+      }
+    ]
+  },
+  "NVDAVuiB7hwd3m5Wa1JuHNovPaPG6BH1QNztbKFxNjv": {
+    "mint": "NVDAVuiB7hwd3m5Wa1JuHNovPaPG6BH1QNztbKFxNjv",
+    "ticker": "PUMP_NVDA",
+    "discovered_at": 1794603122.849633,
+    "kol_price_sol": 2.044407712960244,
+    "kol_price_usd": 347.5493112032415,
+    "mc_usd": 347549311203.24146,
+    "kols": [
+      {
+        "wallet": "6aXFYXbFob1ZKAEDCcqZnX2vooA3TgEqDoy5dAQbeWoV",
+        "name": "Flamesonsol",
+        "sol_spent": 0.0
+      },
+      {
+        "wallet": "AgiGpUAF25B7NL9u8byDcptPcYWi4eFU4kjtcRtaMmdQ",
+        "name": "puxm",
+        "sol_spent": 1.744128889
+      },
+      {
+        "wallet": "B8wB3vh3d7jXUT4ANRwactp9WLskpKbK5WeLkgNm8Dyz",
+        "name": "puuxmm",
+        "sol_spent": 1.956205831
+      }
+    ]
   }
 }

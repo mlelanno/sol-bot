@@ -27,8 +27,8 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
 # Vérification des prérequis
 if not all([TG_API_ID, TG_API_HASH, TG_CHANNELS_RAW]):
-    print("⚠️  Variables d'environnement manquantes : TG_API_ID, TG_API_HASH, TG_CHANNELS")
-    print("   Veuillez compléter .env.example et redémarr le bot.")
+    print("⚠️  Variables d'environments manquantes : TG_API_ID, TG_API_HASH, TG_CHANNELS")
+    print("   Veuillez compléter .env.example et redémarre le bot.")
     sys.exit(0)
 
 # 4. Parse TG_CHANNELS intelligemment
@@ -53,6 +53,11 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger("telegram_listener")
+
+# Import du gestionnaire de config
+from core.config_manager import ConfigManager
+
+config_manager = ConfigManager()
 
 # Import Telethon aprè sconfiguration
 from telethon import TelegramClient, events
@@ -84,7 +89,7 @@ def load_narrative_signals():
 
 
 def save_narrative_signals(signals):
-    now = datetime.now().timestamp()
+    now = asyncio.get_event_loop().time()
     filtered = [s for s in signals if now - s.get("timestamp", 0) <= 1800]
     with open(NARRATIVE_FILE, "w") as f:
         json.dump(filtered, f, indent=2)
@@ -93,7 +98,7 @@ def save_narrative_signals(signals):
 def add_narrative_signal(keywords, narrative_strength):
     signals = load_narrative_signals()
     signals.append({
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": asyncio.get_event_loop().time(),
         "keywords": keywords,
         "narrative_strength": narrative_strength,
         "is_organic": True,
@@ -207,7 +212,7 @@ async def analyze_batch(buffer: list):
 
 
 # Écoute Telegram
-@telegram_client.on(events.NewMessage(channels=True))
+@telegram_client.on(events.NewMessage(chats=True))
 async def handler(event):
     global message_buffer
     channel = event.chat_id
@@ -231,8 +236,13 @@ async def process_batch():
     if analysis is None:
         logger.warning("Aucun résultat d'analyse")
         return
+    # Vérifier si le bot est en pause
+    current_config = config_manager.load_config()
+    if current_config.get("bot_paused", False):
+        logger.info("⏸️ Bot en pause (Kill Switch) - Achat ignoré")
+        return
     audit_entry = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": asyncio.get_event_loop().time(),
         "provider": provider,
         "result": analysis,
     }
