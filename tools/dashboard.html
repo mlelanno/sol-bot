@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUANT TERMINAL // PADRE PRO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bgBase: '#0B0E11',
+                        panelBase: '#12161C',
+                        borderBase: '#1E2329',
+                        neonGreen: '#00FFA3',
+                        neonRed: '#FF3B69',
+                        neonBlue: '#38BDF8',
+                        neonAmber: '#F59E0B'
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        body { background-color: #0B0E11; color: #E2E8F0; font-family: 'ui-monospace', monospace; overflow: hidden; height: 100vh; user-select: none; }
+        .panel { background-color: #12161C; border: 1px solid #1E2329; border-radius: 6px; display: flex; flex-direction: column; overflow: hidden; }
+        .panel-header { background-color: #0E1217; border-bottom: 1px solid #1E2329; padding: 6px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; shrink: 0; }
+        .scrollable { overflow-y: auto; flex: 1; }
+        .tabular { font-variant-numeric: tabular-nums; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #0B0E11; }
+        ::-webkit-scrollbar-thumb { background: #262C36; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00FFA3; }
+    </style>
+</head>
+<body x-data="terminal()" x-init="init()" class="flex flex-col h-screen w-screen">
+
+    <!-- TOP BAR -->
+    <header class="h-12 bg-panelBase border-b border-borderBase px-4 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-5">
+            <div class="flex items-center gap-2">
+                <span class="relative flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" :class="config.bot_paused ? 'bg-neonRed' : 'bg-neonGreen'"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5" :class="config.bot_paused ? 'bg-neonRed' : 'bg-neonGreen'"></span>
+                </span>
+                <span class="text-white font-extrabold tracking-wider text-xs">PADRE<span class="text-neonGreen">//QUANT</span></span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-black/40 border border-borderBase text-gray-400">SOLANA V2</span>
+            </div>
+
+            <div class="h-5 w-[1px] bg-borderBase"></div>
+
+            <!-- KPIs -->
+            <div class="flex items-center gap-5 text-xs tabular">
+                <div>
+                    <span class="text-gray-500 text-[10px] block leading-none">SOL BALANCE</span>
+                    <span class="text-neonBlue font-bold" x-text="fmt(metrics.sol_balance, 4) + ' SOL'"></span>
+                </div>
+                <div>
+                    <span class="text-gray-500 text-[10px] block leading-none">NET PNL</span>
+                    <span :class="(metrics.pnl_total || 0) >= 0 ? 'text-neonGreen' : 'text-neonRed'" class="font-bold" x-text="((metrics.pnl_total || 0) >= 0 ? '+' : '') + fmt(metrics.pnl_total, 4) + ' SOL (' + fmt(metrics.pnl_pct, 1) + '%)'"></span>
+                </div>
+                <div>
+                    <span class="text-gray-500 text-[10px] block leading-none">WINRATE / TRADES</span>
+                    <span class="text-white font-bold" x-text="fmt(metrics.winrate, 1) + '%'"></span>
+                    <span class="text-gray-500 text-[10px]" x-text="'(' + (metrics.total_closed || 0) + ')'"></span>
+                </div>
+                <div>
+                    <span class="text-gray-500 text-[10px] block leading-none">PROFIT FACTOR</span>
+                    <span :class="(metrics.profit_factor || 0) >= 1.2 ? 'text-neonGreen' : ((metrics.profit_factor || 0) >= 1.0 ? 'text-neonAmber' : 'text-neonRed')" class="font-bold" x-text="fmt(metrics.profit_factor, 2)"></span>
+                </div>
+                <div>
+                    <span class="text-gray-500 text-[10px] block leading-none">MAX DRAWDOWN</span>
+                    <span class="text-neonRed font-bold" x-text="'-' + fmt(metrics.max_dd_pct, 1) + '%'"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTROLS -->
+        <div class="flex items-center gap-2.5 text-xs">
+            <span class="text-[10px] text-gray-500 tabular" x-text="'SYNC ' + lastUpdate"></span>
+            <button @click="openSettings()" class="px-2.5 py-1.5 rounded bg-[#181D26] hover:bg-[#222936] border border-borderBase text-gray-200 font-semibold text-[11px] flex items-center gap-1.5 transition">
+                <span>⚙️ PARAMS</span>
+                <span class="text-[10px] text-neonGreen tabular" x-text="'[' + (config.min_score || 60) + 'pts | ' + (config.trade_size_sol || 0.1) + '◎]'"></span>
+            </button>
+            <button @click="toggleKillSwitch()"
+                :class="config.bot_paused ? 'bg-neonRed/20 border-neonRed text-neonRed hover:bg-neonRed hover:text-black' : 'bg-neonGreen/15 border-neonGreen text-neonGreen hover:bg-neonGreen hover:text-black'"
+                class="px-3 py-1.5 rounded border font-extrabold text-[11px] tracking-wider transition">
+                <span x-text="config.bot_paused ? '⏸ PAUSED (KILL SWITCH ON)' : '⚡ ENGINE ACTIVE'"></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN 3-COLUMN WORKSPACE (25% / 50% / 25%) -->
+    <main class="flex-1 grid grid-cols-12 gap-2 p-2 overflow-hidden">
+
+        <!-- LEFT COLUMN (3/12 = 25%): ACTIVE POSITIONS + REJECTS / HISTORY -->
+        <section class="col-span-3 flex flex-col gap-2 overflow-hidden">
+
+            <!-- ACTIVE POSITIONS (45%) -->
+            <div class="panel h-[45%]">
+                <div class="panel-header">
+                    <div class="flex items-center gap-2">
+                        <span class="h-2 w-2 rounded-full bg-neonGreen"></span>
+                        <span class="text-gray-200">Positions Ouvertes</span>
+                    </div>
+                    <span class="px-1.5 py-0.2 bg-neonGreen/10 text-neonGreen rounded text-[10px] tabular" x-text="active_positions.length + ' OPEN'"></span>
+                </div>
+                <div class="scrollable p-1.5 space-y-1.5">
+                    <template x-for="pos in active_positions" :key="pos.mint">
+                        <div @click="selectToken(pos.mint, pos.ticker)"
+                             :class="selectedMint === pos.mint ? 'border-neonGreen bg-[#171F28]' : 'border-borderBase bg-[#0E1217] hover:bg-[#151A22]'"
+                             class="p-2 rounded border cursor-pointer transition">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-extrabold text-xs text-white" x-text="pos.ticker"></span>
+                                    <span class="text-[9px] px-1 rounded bg-white/5 text-gray-400" x-text="'SCORE ' + pos.score"></span>
+                                </div>
+                                <span :class="pos.pnl_pct >= 0 ? 'text-neonGreen' : 'text-neonRed'" class="font-extrabold text-xs tabular" x-text="(pos.pnl_pct >= 0 ? '+' : '') + fmt(pos.pnl_pct, 2) + '%'"></span>
+                            </div>
+                            <div class="flex items-center justify-between text-[10px] text-gray-400 tabular">
+                                <span x-text="'Size: ' + pos.invested_sol + ' SOL'"></span>
+                                <span x-text="'KOLs: ' + (pos.kols ? pos.kols.length : 0)"></span>
+                                <button @click.stop="panicSell(pos.mint, pos.ticker)"
+                                        class="px-2 py-0.5 rounded bg-neonRed/20 border border-neonRed/50 text-neonRed hover:bg-neonRed hover:text-white font-bold text-[10px] transition">
+                                    PANIC SELL
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="active_positions.length === 0" class="h-full flex flex-col items-center justify-center text-gray-600 text-xs py-10">
+                        <span>Aucune position active</span>
+                        <span class="text-[10px] text-gray-700 mt-1">En attente de signaux > <span x-text="config.min_score || 60"></span> pts</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REJECTS X-RAY & TRADE HISTORY TABS (55%) -->
+            <div class="panel h-[55%]">
+                <div class="panel-header">
+                    <div class="flex gap-1">
+                        <button @click="leftTab = 'rejects'"
+                                :class="leftTab === 'rejects' ? 'bg-neonRed/20 text-neonRed border-neonRed/50' : 'text-gray-400 border-transparent hover:text-white'"
+                                class="px-2 py-0.5 rounded border text-[10px] font-bold transition">
+                            🛡️ RAYONS X REJETS (<span x-text="rejected_tokens.length"></span>)
+                        </button>
+                        <button @click="leftTab = 'history'"
+                                :class="leftTab === 'history' ? 'bg-neonGreen/20 text-neonGreen border-neonGreen/50' : 'text-gray-400 border-transparent hover:text-white'"
+                                class="px-2 py-0.5 rounded border text-[10px] font-bold transition">
+                            📜 HISTORIQUE (<span x-text="recent_trades.length"></span>)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TAB 1: REJECTED TOKENS -->
+                <div x-show="leftTab === 'rejects'" class="scrollable p-1.5 space-y-1">
+                    <template x-for="(rej, idx) in rejected_tokens" :key="(rej.timestamp || '') + (rej.mint || idx)">
+                        <div @click="rej.mint && selectToken(rej.mint, rej.ticker)"
+                             class="p-1.5 rounded bg-[#0E1217] hover:bg-[#161C24] border border-borderBase cursor-pointer transition flex items-center justify-between gap-2 text-[11px]">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-bold text-gray-200 truncate" x-text="rej.ticker || 'UNKNOWN'"></span>
+                                    <span x-show="rej.mc_bracket" class="text-[9px] px-1 rounded bg-white/5 text-gray-400" x-text="rej.mc_bracket"></span>
+                                    <span x-show="rej.score !== undefined" class="text-[9px] text-gray-500 tabular" x-text="rej.score + 'pts'"></span>
+                                </div>
+                                <div class="text-[9px] text-gray-600 tabular" x-text="shortTime(rej.timestamp)"></div>
+                            </div>
+                            <span class="px-1.5 py-0.5 rounded bg-neonRed/10 border border-neonRed/30 text-neonRed text-[10px] font-semibold truncate max-w-[150px]" x-text="rej.reason || 'Filtre sécurité'"></span>
+                        </div>
+                    </template>
+                    <div x-show="rejected_tokens.length === 0" class="text-center text-gray-600 text-xs py-8">
+                        Aucun rejet journalisé pour le moment
+                    </div>
+                </div>
+
+                <!-- TAB 2: CLOSED TRADES HISTORY -->
+                <div x-show="leftTab === 'history'" x-cloak class="scrollable p-1.5 space-y-1">
+                    <template x-for="(tr, idx) in recent_trades" :key="(tr.timestamp || '') + (tr.mint || idx)">
+                        <div @click="tr.mint && selectToken(tr.mint, tr.ticker)"
+                             class="p-1.5 rounded bg-[#0E1217] hover:bg-[#161C24] border border-borderBase cursor-pointer transition flex items-center justify-between text-[11px] tabular">
+                            <div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-bold text-white" x-text="tr.ticker"></span>
+                                    <span class="text-[9px] px-1 rounded bg-white/5 text-gray-400" x-text="tr.reason"></span>
+                                </div>
+                                <div class="text-[9px] text-gray-500" x-text="shortTime(tr.timestamp) + ' • KOLs: ' + (tr.kols ? tr.kols.length : 0)"></div>
+                            </div>
+                            <div class="text-right">
+                                <div :class="tr.pnl_sol >= 0 ? 'text-neonGreen' : 'text-neonRed'" class="font-bold" x-text="(tr.pnl_sol >= 0 ? '+' : '') + fmt(tr.pnl_sol, 4) + ' ◎'"></div>
+                                <div :class="tr.pnl_pct >= 0 ? 'text-neonGreen/80' : 'text-neonRed/80'" class="text-[10px]" x-text="(tr.pnl_pct >= 0 ? '+' : '') + fmt(tr.pnl_pct, 1) + '%'"></div>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="recent_trades.length === 0" class="text-center text-gray-600 text-xs py-8">
+                        Aucun trade clôturé dans cette session
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CENTER COLUMN (6/12 = 50%): DEXSCREENER LIVE CHART -->
+        <section class="col-span-6 panel flex flex-col overflow-hidden">
+            <div class="panel-header">
+                <div class="flex items-center gap-2">
+                    <span class="text-neonGreen font-extrabold" x-text="selectedTicker"></span>
+                    <span class="text-[10px] text-gray-500 font-mono select-all" x-text="selectedMint"></span>
+                    <button @click="copyMint()" class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-300">📋 Copy</button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button @click="selectToken('So11111111111111111111111111111111111111112', 'SOL / USD')" class="text-[10px] px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-300">SOL Chart</button>
+                    <a :href="'https://dexscreener.com/solana/' + selectedMint" target="_blank" class="text-[10px] px-2 py-0.5 rounded bg-neonBlue/10 text-neonBlue hover:bg-neonBlue/20">DexScreener ↗</a>
+                    <a :href="'https://solscan.io/token/' + selectedMint" target="_blank" class="text-[10px] px-2 py-0.5 rounded bg-white/5 text-gray-300 hover:bg-white/10">Solscan ↗</a>
+                </div>
+            </div>
+            <div class="flex-1 bg-black relative">
+                <iframe :src="'https://dexscreener.com/solana/' + selectedMint + '?embed=1&theme=dark&trades=0&info=0'"
+                        class="w-full h-full border-none"></iframe>
+            </div>
+        </section>
+
+        <!-- RIGHT COLUMN (3/12 = 25%): NARRATIVE AI RADAR + TIER 1 WALLETS / ML WEIGHTS -->
+        <section class="col-span-3 flex flex-col gap-2 overflow-hidden">
+
+            <!-- NARRATIVE AI RADAR (58%) -->
+            <div class="panel h-[58%]">
+                <div class="panel-header">
+                    <div class="flex items-center gap-2">
+                        <span class="h-2 w-2 rounded-full bg-neonBlue animate-pulse"></span>
+                        <span class="text-gray-200">Radar Narrative IA (TG/Gemini)</span>
+                    </div>
+                    <span class="text-[10px] text-neonBlue tabular" x-text="narrative.signals.length + ' ACTIFS'"></span>
+                </div>
+
+                <div class="scrollable p-1.5 space-y-2">
+                    <!-- Active TTL 30m Signals -->
+                    <div x-show="narrative.signals.length > 0" class="space-y-1">
+                        <div class="text-[9px] text-neonGreen uppercase font-bold px-1">🔥 Catalyseurs Actifs (TTL 30m)</div>
+                        <template x-for="(sig, idx) in narrative.signals" :key="idx">
+                            <div class="p-2 rounded bg-neonGreen/5 border border-neonGreen/30 text-[11px]">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="font-bold text-neonGreen" x-text="(sig.keywords || []).join(', ')"></span>
+                                    <span class="text-[10px] font-bold tabular text-white" x-text="sig.narrative_strength + '/100'"></span>
+                                </div>
+                                <div class="w-full bg-black/50 h-1.5 rounded overflow-hidden">
+                                    <div class="bg-neonGreen h-full transition-all" :style="'width:' + (sig.ttl_pct || 50) + '%'"></div>
+                                </div>
+                                <div class="text-[9px] text-gray-400 mt-1 text-right tabular" x-text="'Expire dans ' + Math.floor((sig.ttl_seconds || 0)/60) + 'm ' + ((sig.ttl_seconds || 0)%60) + 's'"></div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Audit Stream -->
+                    <div class="space-y-1">
+                        <div class="text-[9px] text-gray-400 uppercase font-bold px-1">📡 Flux Audit LLM (Batch 3 min)</div>
+                        <template x-for="(item, idx) in narrative.audit" :key="item.timestamp || idx">
+                            <div class="p-2 rounded bg-[#0E1217] border border-borderBase text-[11px] space-y-1">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[9px] text-gray-500 tabular" x-text="shortTime(item.timestamp) + ' • ' + (item.provider || 'LLM')"></span>
+                                    <span x-show="item.result && item.result.shill_pattern_detected"
+                                          class="px-1.5 py-0.2 rounded bg-neonRed/20 text-neonRed font-bold text-[9px]">⚠️ SHILL BLOCKED</span>
+                                    <span x-show="item.result && item.result.external_catalyst && !item.result.shill_pattern_detected"
+                                          class="px-1.5 py-0.2 rounded bg-neonGreen/20 text-neonGreen font-bold text-[9px]">✅ CATALYST</span>
+                                    <span x-show="!item.result || (!item.result.external_catalyst && !item.result.shill_pattern_detected)"
+                                          class="px-1.5 py-0.2 rounded bg-white/5 text-gray-400 text-[9px]">BRUIT</span>
+                                </div>
+                                <div class="flex items-center justify-between text-[10px]">
+                                    <span class="text-gray-300 truncate" x-text="item.result && item.result.keywords && item.result.keywords.length ? item.result.keywords.join(', ') : 'Aucun mot-clé retenu'"></span>
+                                    <span class="text-gray-400 font-bold tabular ml-2" x-text="(item.result ? (item.result.narrative_strength || 0) : 0) + ' pts'"></span>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="narrative.audit.length === 0" class="text-center text-gray-600 text-xs py-6">
+                            En attente du prochain batch Telegram (180s)...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOTTOM RIGHT (42%): TIER 1 WALLETS & ML BRACKETS -->
+            <div class="panel h-[42%]">
+                <div class="panel-header">
+                    <div class="flex gap-1">
+                        <button @click="rightTab = 'ml'"
+                                :class="rightTab === 'ml' ? 'bg-neonBlue/20 text-neonBlue border-neonBlue/50' : 'text-gray-400 border-transparent hover:text-white'"
+                                class="px-2 py-0.5 rounded border text-[10px] font-bold transition">
+                            🧠 CALIBRATION ML (30 TRADES)
+                        </button>
+                        <button @click="rightTab = 'kols'"
+                                :class="rightTab === 'kols' ? 'bg-neonAmber/20 text-neonAmber border-neonAmber/50' : 'text-gray-400 border-transparent hover:text-white'"
+                                class="px-2 py-0.5 rounded border text-[10px] font-bold transition">
+                            🐋 TIER 1 KOLS (<span x-text="tier1_wallets.length"></span>)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ML PROGRESS BARS -->
+                <div x-show="rightTab === 'ml'" class="scrollable p-2.5 space-y-2.5">
+                    <template x-for="(bData, bracket) in ml_weights" :key="bracket">
+                        <div class="p-2 rounded bg-[#0E1217] border border-borderBase">
+                            <div class="flex justify-between items-center text-xs mb-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-white" x-text="bracket + ' Cap'"></span>
+                                    <span class="text-[10px] text-gray-400 tabular" x-text="'WR: ' + fmt(bData.winrate, 1) + '%'"></span>
+                                </div>
+                                <span :class="bData.count >= 30 ? 'text-neonGreen' : 'text-neonAmber'" class="text-[10px] font-bold tabular"
+                                      x-text="bData.count >= 30 ? 'ACTIF (' + bData.count + '/30)' : 'OBSERVATION (' + bData.count + '/30)'"></span>
+                            </div>
+                            <div class="w-full bg-black/60 h-2 rounded overflow-hidden">
+                                <div :class="bData.count >= 30 ? 'bg-neonGreen' : 'bg-neonBlue'" class="h-full transition-all" :style="'width:' + (bData.progress_pct || 0) + '%'"></div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- TIER 1 WALLETS LEADERBOARD -->
+                <div x-show="rightTab === 'kols'" x-cloak class="scrollable p-1.5 space-y-1">
+                    <template x-for="w in tier1_wallets" :key="w.address">
+                        <div class="p-1.5 rounded bg-[#0E1217] border border-borderBase flex items-center justify-between text-[11px] tabular">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="text-[10px] font-bold text-neonAmber w-5" x-text="'#' + w.rank"></span>
+                                <div class="truncate">
+                                    <div class="font-bold text-gray-200 truncate" x-text="w.name"></div>
+                                    <div class="text-[9px] text-gray-500" x-text="w.calls + ' calls • WR ' + w.winrate + '%'"></div>
+                                </div>
+                            </div>
+                            <span :class="w.total_pnl >= 0 ? 'text-neonGreen' : 'text-neonRed'" class="font-bold" x-text="(w.total_pnl >= 0 ? '+' : '') + fmt(w.total_pnl, 3) + ' ◎'"></span>
+                        </div>
+                    </template>
+                    <div x-show="tier1_wallets.length === 0" class="text-center text-gray-600 text-xs py-6">
+                        Aucun wallet Tier 1 classé pour l'instant
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- SETTINGS MODAL (HOT RELOAD bot_config.json) -->
+    <div x-show="showSettings" x-cloak class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50">
+        <div @click.away="showSettings = false" class="bg-panelBase border border-borderBase rounded-lg w-96 p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-borderBase pb-2.5">
+                <span class="font-extrabold text-sm text-white">⚙️ CONFIGURATION À CHAUD</span>
+                <button @click="showSettings = false" class="text-gray-400 hover:text-white text-sm">✕</button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-gray-400 mb-1">Score Minimum d'Entrée (0 - 100)</label>
+                    <input type="number" step="1" x-model.number="formConfig.min_score" class="w-full bg-[#0B0E11] border border-borderBase rounded px-3 py-1.5 text-white font-bold tabular">
+                </div>
+                <div>
+                    <label class="block text-gray-400 mb-1">Taille de Mise par Trade (SOL)</label>
+                    <input type="number" step="0.01" x-model.number="formConfig.trade_size_sol" class="w-full bg-[#0B0E11] border border-borderBase rounded px-3 py-1.5 text-white font-bold tabular">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-gray-400 mb-1">Stop-Loss (%)</label>
+                        <input type="number" step="1" x-model.number="formConfig.stop_loss_pct" class="w-full bg-[#0B0E11] border border-borderBase rounded px-3 py-1.5 text-neonRed font-bold tabular">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 mb-1">Take-Profit (%)</label>
+                        <input type="number" step="1" x-model.number="formConfig.take_profit_pct" class="w-full bg-[#0B0E11] border border-borderBase rounded px-3 py-1.5 text-neonGreen font-bold tabular">
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-borderBase">
+                <button @click="showSettings = false" class="px-3 py-1.5 rounded bg-white/5 text-gray-300 text-xs">Annuler</button>
+                <button @click="saveSettings()" class="px-4 py-1.5 rounded bg-neonGreen text-black font-extrabold text-xs">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('terminal', () => ({
+                selectedMint: 'So11111111111111111111111111111111111111112',
+                selectedTicker: 'SOL / USD',
+                leftTab: 'rejects',
+                rightTab: 'ml',
+                showSettings: false,
+                lastUpdate: '--:--:--',
+                metrics: {},
+                config: { bot_paused: false, min_score: 60, trade_size_sol: 0.1, stop_loss_pct: -25.0, take_profit_pct: 60.0 },
+                formConfig: { min_score: 60, trade_size_sol: 0.1, stop_loss_pct: -25.0, take_profit_pct: 60.0 },
+                active_positions: [],
+                recent_trades: [],
+                rejected_tokens: [],
+                narrative: { signals: [], audit: [] },
+                tier1_wallets: [],
+                ml_weights: {},
+
+                fmt(val, decimals = 2) {
+                    const num = parseFloat(val);
+                    return isNaN(num) ? (0).toFixed(decimals) : num.toFixed(decimals);
+                },
+                shortTime(iso) {
+                    if (!iso) return '';
+                    const str = String(iso);
+                    return str.includes('T') ? str.split('T')[1].substring(0, 8) : str.substring(0, 8);
+                },
+                selectToken(mint, ticker) {
+                    if (!mint) return;
+                    this.selectedMint = mint;
+                    this.selectedTicker = ticker || mint.substring(0, 6);
+                },
+                copyMint() {
+                    navigator.clipboard.writeText(this.selectedMint);
+                },
+                openSettings() {
+                    this.formConfig = { ...this.config };
+                    this.showSettings = true;
+                },
+                async saveSettings() {
+                    const res = await fetch('/api/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.formConfig)
+                    });
+                    if (res.ok) {
+                        this.showSettings = false;
+                        await this.fetchState();
+                    }
+                },
+                async toggleKillSwitch() {
+                    const nextState = !this.config.bot_paused;
+                    await fetch('/api/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...this.config, bot_paused: nextState })
+                    });
+                    await this.fetchState();
+                },
+                async panicSell(mint, ticker) {
+                    if (!confirm(`PANIC SELL immédiat sur ${ticker} (${mint}) ?`)) return;
+                    await fetch('/api/panic-sell/' + mint, { method: 'POST' });
+                    await this.fetchState();
+                },
+                async fetchState() {
+                    try {
+                        const res = await fetch('/api/state');
+                        if (!res.ok) return;
+                        const d = await res.json();
+                        this.metrics = d.metrics || {};
+                        this.config = d.config || this.config;
+                        this.active_positions = d.active_positions || [];
+                        this.recent_trades = d.recent_trades || [];
+                        this.rejected_tokens = d.rejected_tokens || [];
+                        this.narrative = d.narrative || { signals: [], audit: [] };
+                        this.tier1_wallets = d.tier1_wallets || [];
+                        this.ml_weights = d.ml_weights || {};
+                        this.lastUpdate = new Date().toLocaleTimeString('fr-FR');
+                    } catch (e) {
+                        console.error('State error:', e);
+                    }
+                },
+                init() {
+                    this.fetchState();
+                    setInterval(() => this.fetchState(), 2000);
+                }
+            }));
+        });
+    </script>
+</body>
+</html>

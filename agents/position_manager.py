@@ -1,318 +1,148 @@
-#!/usr/bin/env python3
-"""Position Manager - Surveillance des positions trading avec stop-loss et take-profit."""
-
-import asyncio
-import aiohttp
-import json
-import os
-import sys
-import time
+import json, os, time, asyncio, aiohttp
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Optional
 
-BASE_DIR = "/home/kilpi/trading_bot"
-ACTIVE_POSITIONS_FILE = os.path.join(BASE_DIR, "data", "active_positions.json")
-PAPER_TRADES_FILE = os.path.join(BASE_DIR, "logs", "paper_trades.json")
-TELEGRAM_BOT_TOKEN_FILE = os.path.join(BASE_DIR, ".env")
-DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/tokens"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+POSITIONS_FILE = os.path.join(BASE_DIR, "data", "active_positions.json")
+TRADES_FILE = os.path.join(BASE_DIR, "logs", "paper_trades.json")
+CONFIG_FILE = os.path.join(BASE_DIR, "data", "bot_config.json")
+ML_FILE = os.path.join(BASE_DIR, "data", "ml_weights.json")
 
-CHECK_INTERVAL = 10
-
-
-def load_env() -> dict:
-    env_vars = {}
-    if os.path.exists(TELEGRAM_BOT_TOKEN_FILE):
-        with open(TELEGRAM_BOT_TOKEN_FILE, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, value = line.split("=", 1)
-                    env_vars[key.strip()] = value.strip().strip('"\'')
-    return env_vars
-
-
-async def fetch_price(mint_address: str, session: aiohttp.ClientSession) -> float | None:
+def load_json(path, default):
     try:
-        url = f"{DEXSCREENER_API_URL}/{mint_address}"
-        async with session.get(url, timeout=4) as response:
-            if response.status == 200:
-                data = await response.json()
-                pairs = data.get("pairs", [])
-                if pairs and len(pairs) > 0:
-                    return float(pairs[0].get("priceUsd", 0))
-    except Exception as e:
-        print(f"[WARN] Erreur fetch prix pour {mint_address[:8]}... : {type(e).__name__}")
-    return None
-
-
-async def send_telegram(message: str) -> bool:
-    import urllib.parse
-    
-    token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
-    
-    if not token or not channel_id:
-        return False
-    
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, data={
-                "chat_id": channel_id, 
-                "text": message, 
-                "parse_mode": "HTML"
-            }) as response:
-                return response.status == 200
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
     except Exception:
         pass
-    return False
+    return default
 
+def atomic_save(path, data):
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp, path)
 
-def load_positions() -> dict:
-    try:
-        with open(ACTIVE_POSITIONS_FILE, "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+def update_ml_calibration(mc_usd: float, net_pnl_sol: float):
+    ml = load_json(ML_FILE, {})
+    b = "Micro" if mc_usd < 100_000 else ("Low" if mc_usd < 500_000 else "Mid")
+    entry = ml.get(b, {"wins": 0, "trades": 0, "count": 0, "winrate": 0.0})
+    cnt = int(entry.get("count", entry.get("trades", 0))) + 1
+    wins = int(entry.get("wins", 0)) + (1 if net_pnl_sol > 0 else 0)
+    wr = round((wins / cnt) * 100.0, 1) if cnt > 0 else 0.0
+    status = "CALIBRATED" if cnt >= 30 else f"OBSERVATION ({cnt}/30)"
+    ml[b] = {"wins": wins, "trades": cnt, "count": cnt, "winrate": wr, "status": status}
+    atomic_save(ML_FILE, ml)
+
+async def fetch_dex_data(mints):
+    if not mints:
         return {}
-
-
-def save_positions(positions: dict) -> bool:
+    url = f"https://api.dexscreener.com/latest/dex/tokens/{','.join(mints[:30])}"
+    out = {}
     try:
-        os.makedirs(os.path.dirname(ACTIVE_POSITIONS_FILE), exist_ok=True)
-        with open(ACTIVE_POSITIONS_FILE, "w") as f:
-            json.dump(positions, f, indent=2)
-        return True
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4.0)) as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    for pair in data.get("pairs") or []:
+                        mint = (pair.get("baseToken") or {}).get("address")
+                        price = float(pair.get("priceUsd") or 0.0)
+                        liq = float((pair.get("liquidity") or {}).get("usd") or 10000.0)
+                        if mint and price > 0 and (mint not in out or liq > out[mint]["liq"]):
+                            out[mint] = {"price": price, "liq": liq}
     except Exception as e:
-        print(f"[ERROR] Sauvegarde échouée : {e}")
-        return False
+        print(f"[DEX WARN] {e}")
+    return out
 
+async def manage_positions():
+    print("🛡️ Position Manager V2 actif (TP/SL/Trailing/TTL + Calibration ML 30 trades)...")
+    while True:
+        try:
+            cfg = load_json(CONFIG_FILE, {"bot_paused": False, "stop_loss_pct": -25.0, "take_profit_pct": 60.0})
+            tp_pct = float(cfg.get("take_profit_pct", 60.0))
+            sl_pct = float(cfg.get("stop_loss_pct", -25.0))
 
-def append_trade(trade_record: dict) -> bool:
-    try:
-        os.makedirs(os.path.dirname(PAPER_TRADES_FILE), exist_ok=True)
-        with open(PAPER_TRADES_FILE, "r") as f:
-            trades = json.load(f)
-        trades.append(trade_record)
-        with open(PAPER_TRADES_FILE, "w") as f:
-            json.dump(trades, f, indent=2)
-    except Exception as e:
-        print(f"[ERROR] Ajout trade échoué : {e}")
-        return False
-    return True
-async def process_position(mint_address: str, current_price: float) -> dict | None:
-    positions = load_positions()
-    
-    if mint_address not in positions:
-        print(f"[WARN] {mint_address[:8]}... pas trouvé dans les positions actives")
-        return None
-    
-    position = positions[mint_address]
-    entry_price_usd = float(position.get("entry_price_usd", 0))
-    tokens_held = float(position.get("tokens_held", 0)) or float(position.get("tokens", 0))
-    tp1_executed = bool(position.get("tp1_executed", False))
-    
-    if entry_price_usd <= 0:
-        print(f"[ERROR] Prix d'entrée invalide pour {mint_address[:8]}... ({entry_price_usd})")
-        return None
-    
-    pnl_pct = ((current_price - entry_price_usd) / entry_price_usd) * 100
-    action_type = None
-    trade_record = None
-    
-    # Stop-loss (-30%) : VENT 100% + suppression
-    if pnl_pct <= -30.0:
-        action_type = "STOP_LOSS"
-        tokens_to_sell = tokens_held
-        sell_sol = tokens_to_sell * current_price
-        trade_record = {
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S") + "+00:00",
-            "action": "SELL",
-            "reason": "STOP-LOSS (-30%)",
-            "mint": mint_address,
-            "current_price_usd": current_price,
-            "entry_price_usd": entry_price_usd,
-            "pnl_pct": round(pnl_pct, 2),
-            "tokens_sold": round(tokens_to_sell, 6),
-            "sell_sol": round(sell_sol, 4)
-        }
-    
-    # Take-Profit 1 (+100%) si pas exécuté : VENT 50%
-    elif pnl_pct >= 100.0 and not tp1_executed:
-        action_type = "TAKE_PROFIT_1"
-        tokens_to_sell = tokens_held / 2.0
-        sell_sol = tokens_to_sell * current_price
-        new_tokens_held = tokens_held - tokens_to_sell
-        trade_record = {
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S") + "+00:00",
-            "action": "SELL_PARTIAL",
-            "reason": "TAKE-PROFIT 1 (+100%) - 50% vendus",
-            "mint": mint_address,
-            "current_price_usd": current_price,
-            "entry_price_usd": entry_price_usd,
-            "pnl_pct": round(pnl_pct, 2),
-            "tokens_sold": round(tokens_to_sell, 6),
-            "sell_sol": round(sell_sol, 4)
-        }
-        
-        if action_type == "TAKE_PROFIT_1" and new_tokens_held > 0:
-            old_position = positions[mint_address]
-            remaining_tokens = new_tokens_held
-            new_entry_price = round(
-                (tokens_to_sell * current_price + entry_price_usd * remaining_tokens) / 
-                (remaining_tokens + 1e-9), 6
-            ) if remaining_tokens > 0 else current_price
-            
-            old_position["tokens"] = remaining_tokens
-            old_position["entry_price_usd"] = new_entry_price
-            old_position["tp1_executed"] = True
-            positions[mint_address] = old_position
-            
-            trade_record["current_position"] = {
-                "tokens": remaining_tokens,
-                "entry_price_usd": new_entry_price
-            }
-    
-    # Take-Profit 2 (+300%) : VENT 100% des restants
-    elif pnl_pct >= 300.0:
-        action_type = "TAKE_PROFIT_2"
-        tokens_to_sell = tokens_held
-        sell_sol = tokens_to_sell * current_price
-        trade_record = {
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S") + "+00:00",
-            "action": "SELL",
-            "reason": "TAKE-PROFIT 2 (+300%) - Clôture totale",
-            "mint": mint_address,
-            "current_price_usd": current_price,
-            "entry_price_usd": entry_price_usd,
-            "pnl_pct": round(pnl_pct, 2),
-            "tokens_sold": round(tokens_to_sell, 6),
-            "sell_sol": round(sell_sol, 4)
-        }
-    
-    if not trade_record:
-        print(f"[INFO] Aucune action pour {mint_address[:8]}... (P&L={pnl_pct:.2f}%)")
-        return None
-    
-    # Construire le message Telegram
-    remaining_tokens = new_tokens_held if action_type in ("TAKE_PROFIT_1",) else 0
+            positions = load_json(POSITIONS_FILE, {})
+            if isinstance(positions, list):
+                positions = {p.get("mint") or p.get("contract_address"): p for p in positions if isinstance(p, dict)}
 
-    if action_type == "STOP_LOSS":
-        pnl_pct_val = round(pnl_pct, 2)
-        msg = f"<b>🛑 STOP-LOSS DÉCLANCHÉ</b>\n\n"
-        msg += f"<b>Prix cible:</b> {current_price:.6f} USD ({pnl_pct_val}% {'perte' if pnl_pct_val < 0 else 'gain'})\n"
-        msg += f"<b>Raison:</b> {trade_record['reason']}\n\n"
-        msg += f"<b>💰 Réalisé :</b>\n"
-        msg += f"• Vendu : {tokens_to_sell} tokens ({sell_sol:.4f} SOL)\n"
-        msg += f"{mint_address[:8]}...\n\n"
-        
-        if remaining_tokens > 0:
-            new_entry_price = round(
-                (tokens_to_sell * current_price + entry_price_usd * remaining_tokens) / 
-                (remaining_tokens + 1e-9), 6
-            )
-            
-            old_position = positions[mint_address]
-            old_position["tokens"] = remaining_tokens
-            old_position["entry_price_usd"] = new_entry_price
-            
-            msg += f"<b>📊 Position restante :</b>\n"
-            msg += f"• {remaining_tokens} tokens à {new_entry_price:.6f} USD\n"
-    
-    elif action_type == "TAKE_PROFIT_1":
-        if remaining_tokens > 0:
-            new_entry_price = round(
-                (tokens_to_sell * current_price + entry_price_usd * remaining_tokens) / 
-                (remaining_tokens + 1e-9), 6
-            )
-            
-            old_position = positions[mint_address]
-            old_position["tokens"] = remaining_tokens
-            old_position["entry_price_usd"] = new_entry_price
-            old_position["tp1_executed"] = True
-            
-        msg = f"<b>✅ TAKE-PROFIT 1 ACTIF</b>\n\n"
-        msg += f"<b>Objectif:</b> +100% ✅\n\n"
-        msg += f"<b>Raison:</b> {trade_record['reason']}\n\n"
-        msg += f"<b>💰 Réalisé :</b>\n"
-        msg += f"• Vendu : {tokens_to_sell} tokens ({sell_sol:.4f} SOL)\n"
-        msg += f"{mint_address[:8]}...\n\n"
-        
-        if remaining_tokens > 0:
-            msg += f"<b>📊 Position restante :</b>\n"
-            msg += f"• {remaining_tokens} tokens à {new_entry_price:.6f} USD\n"
-    
-    elif action_type == "TAKE_PROFIT_2":
-        msg = f"<b>✅ TAKE-PROFIT 2 ACTIF</b>\n\n"
-        msg += f"<b>Objectif:</b> +300% ✅\n\n"
-        msg += f"<b>💰 Réalisé :</b>\n"
-        msg += f"• Vendu : {tokens_to_sell} tokens ({sell_sol:.4f} SOL)\n"
-        msg += f"{mint_address[:8]}...\n\n"
-    
-    if action_type:
-        mint_short = f"{mint_address[:8]}...{mint_address[-4]}"
-        print(f"[INFO] Trade enregistré pour {mint_short} : {action_type}")
-        
-        trade_record["telegram_msg"] = msg
-    
-    # Sauvegarder le trade
-    append_trade(trade_record)
-    
-    # Retirer la position du dictionnaire si elle est totalement vendue (STOP_LOSS ou TAKE_PROFIT_2)
-    # pour éviter la boucle infinie de ré-écriture des positions terminées
-    if action_type in ["STOP_LOSS", "TAKE_PROFIT_2"]:
-        del positions[mint_address]
-    
-    return trade_record
+            if not positions:
+                await asyncio.sleep(5)
+                continue
 
+            dex_info = await fetch_dex_data(list(positions.keys()))
+            trades = load_json(TRADES_FILE, [])
+            changed = False
+            now = time.time()
 
-async def run_position_manager(check_interval: int = 10) -> None:
-    """Fonction principale pour surveiller et gérer les positions."""
-    async with aiohttp.ClientSession() as session:
-        while True:
-            try:
-                print(f"[INFO] Chargement des positions actives...")
-                
-                positions = load_positions()
-                
-                if not positions or len(positions) == 0:
-                    print("[INFO] Aucune position active - surveillance en attente...")
-                    await asyncio.sleep(check_interval)
+            for mint, pos in list(positions.items()):
+                info = dex_info.get(mint)
+                opened_at = float(pos.get("opened_at") or now)
+                age_sec = now - opened_at
+
+                # Protection Time-Stop (45 min max ou 10 min sans indexation DexScreener)
+                if not info:
+                    if age_sec > 600:
+                        del positions[mint]
+                        changed = True
                     continue
-                
-                print(f"[INFO] {len(positions)} position(s) active(s) à surveiller")
-                
-                for mint_address, position in positions.items():
-                    price = await fetch_price(mint_address, session)
-                    
-                    if price is None:
-                        print(f"[WARN] Timeout après 4s - ignoring {mint_address[:8]}... pour ce cycle")
-                        continue
-                    
-                    pnl_pct = ((price - float(position.get("entry_price_usd", 0))) / 
-                               float(position.get("entry_price_usd", 1))) * 100
-                    
-                    await process_position(mint_address, price)
-                
-                save_positions(positions)
-                
-                elapsed = time.time() - time.monotonic_start if hasattr(time, 'monotonic_start') else 0
-                remaining = check_interval - (elapsed % check_interval)
-                if remaining > 0:
-                    await asyncio.sleep(remaining)
-                    
-            except KeyboardInterrupt:
-                print("[INFO] Position Manager arrêté par l'utilisateur")
-                break
-            except Exception as e:
-                print(f"[ERROR] Erreur critique : {type(e).__name__} - {e}")
-                import traceback
-                traceback.print_exc()
 
+                live_price = info["price"]
+                liq_usd = info["liq"]
+                entry_price = float(pos.get("entry_price") or pos.get("buy_price") or 0.0)
+                if entry_price <= 0:
+                    continue
+
+                raw_pnl_pct = ((live_price - entry_price) / entry_price) * 100.0
+                peak_pnl = max(float(pos.get("peak_pnl_pct", 0.0)), raw_pnl_pct)
+                pos["current_price"] = live_price
+                pos["pnl_pct"] = round(raw_pnl_pct, 2)
+                pos["peak_pnl_pct"] = round(peak_pnl, 2)
+                changed = True
+
+                exit_reason = None
+                is_emergency = False
+                if raw_pnl_pct >= tp_pct:
+                    exit_reason = f"TAKE_PROFIT (+{raw_pnl_pct:.1f}%)"
+                elif raw_pnl_pct <= sl_pct:
+                    exit_reason = f"STOP_LOSS ({raw_pnl_pct:.1f}%)"
+                    is_emergency = True
+                elif peak_pnl >= 40.0 and raw_pnl_pct <= 12.0:
+                    exit_reason = f"TRAILING_STOP (+{raw_pnl_pct:.1f}% après pic +{peak_pnl:.0f}%)"
+                elif age_sec >= 2700 and abs(raw_pnl_pct) < 15.0:
+                    exit_reason = f"TIME_STOP_45M ({raw_pnl_pct:+.1f}%)"
+
+                if exit_reason:
+                    invested = float(pos.get("invested_sol") or pos.get("trade_size") or 0.1)
+                    # Slippage de sortie réaliste basé sur l'urgence et la liquidité
+                    sell_slip = (0.12 if is_emergency else 0.04) + min(0.15, (invested * 180.0) / max(1000.0, liq_usd))
+                    jito_tip = 0.0025 if is_emergency else 0.0015
+                    exec_exit_price = live_price * (1.0 - sell_slip)
+                    net_pnl_pct = ((exec_exit_price - entry_price) / entry_price) * 100.0
+                    net_pnl_sol = (invested * (net_pnl_pct / 100.0)) - jito_tip
+
+                    print(f"⚡ [EXIT] {pos.get('ticker', mint[:6])} | {exit_reason} | Net: {net_pnl_sol:+.4f} SOL ({net_pnl_pct:+.1f}%)")
+                    trades.append({
+                        "timestamp": datetime.now().isoformat(),
+                        "action": "SELL",
+                        "contract_address": mint,
+                        "ticker": pos.get("ticker", mint[:6]),
+                        "price_usd": exec_exit_price,
+                        "trade_size": invested,
+                        "pnl_sol": round(net_pnl_sol, 6),
+                        "pnl_pct": round(net_pnl_pct, 2),
+                        "fees_sol": jito_tip,
+                        "reason": exit_reason,
+                        "kols": pos.get("kols", [])
+                    })
+                    update_ml_calibration(float(pos.get("mc_usd") or 50000.0), net_pnl_sol)
+                    del positions[mint]
+
+            if changed:
+                atomic_save(POSITIONS_FILE, positions)
+                atomic_save(TRADES_FILE, trades)
+        except Exception as e:
+            print(f"[PM ERROR] {e}")
+        await asyncio.sleep(5)
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(run_position_manager(check_interval=10))
-    except Exception as e:
-        print(f"[FATAL] Erreur fatale : {type(e).__name__} - {e}")
-        sys.exit(1)
+    asyncio.run(manage_positions())

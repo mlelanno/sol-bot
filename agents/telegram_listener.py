@@ -122,153 +122,118 @@ OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
 
 # -------------------------------------------------------
-# Fonctions utilitaires d'analyse Gemini / OpenRouter
+# Pipeline Narrative V2 : Temps Réel + Audit Gemini 2.5 Flash
 # -------------------------------------------------------
+BUFFER_FILE = os.path.join(BASE_DIR, "data", "tg_buffer.json")
+AUDIT_FILE = os.path.join(BASE_DIR, "logs", "narrative_audit.jsonl")
 
+def append_to_buffer(msg_text: str):
+    if not msg_text or len(msg_text.strip()) < 5:
+        return
+    try:
+        hist = json.load(open(BUFFER_FILE, encoding="utf-8")) if os.path.exists(BUFFER_FILE) else []
+        if not isinstance(hist, list): hist = []
+    except Exception:
+        hist = []
+    clean = msg_text.strip().replace("\n", " ")[:350]
+    if clean not in hist:
+        hist = (hist + [clean])[-50:]
+        with open(BUFFER_FILE, "w", encoding="utf-8") as f:
+            json.dump(hist, f, ensure_ascii=False, indent=2)
 
-async def call_gemini(messages_text: str):
-    if not GEMINI_API_KEY:
+async def call_gemini_v2(messages_list):
+    if not GEMINI_API_KEY or not messages_list:
         return None
     import aiohttp
+    joined = "\n".join(f"- {m}" for m in messages_list[-25:])
+    prompt = (
+        "Tu es un analyste quantitatif Solana. Analyse ces messages Telegram récents et extrais les "
+        "narratives/tickers crypto émergents. Réponds UNIQUEMENT en JSON valide avec exactement ces clés: "
+        '{"external_catalyst": true/false, "shill_pattern_detected": true/false, '
+        '"keywords": ["mot1", "ticker2"], "narrative_strength": 0 à 45, "summary": "résumé court"}.\n\n'
+        f"Messages:\n{joined}"
+    )
     url = f"{GEMINI_ENDPOINT}?key={GEMINI_API_KEY}"
     payload = {
-        "contents": messages_text,
-        "generationConfig": {
-            "responseMimeType": "application/json",
-        },
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseMimeType": "application/json"}
     }
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, timeout=15) as resp:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=12.0)) as session:
+            async with session.post(url, json=payload) as resp:
                 if resp.status != 200:
                     logger.warning(f"Gemini HTTP {resp.status}")
                     return None
                 data = await resp.json()
-        text = data.get("text", "")
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start == -1 or end <= start:
-            logger.warning("Pas de JSON trouvé dans la réponse Gemini")
-            return None
-        result = json.loads(text[start:end])
-        required = {"external_catalyst", "shill_pattern_detected", "keywords", "narrative_strength"}
-        if not required.issubset(set(result.keys())):
-            logger.warning(f"Champs manquants dans le JSON Gemini : {result}")
-            return None
-        return result
+                txt = data["candidates"][0]["content"]["parts"][0]["text"]
+                return json.loads(txt)
     except Exception as e:
-        logger.error(f"Erreur Gemini : {e}")
+        logger.error(f"Erreur Gemini V2 : {e}")
         return None
 
-
-async def call_openrouter(messages_text: str):
-    if not OPENROUTER_API_KEY:
-        return None
-    import aiohttp
-    url = OPENROUTER_ENDPOINT
-    payload = {
-        "model": OPENROUTER_MODEL,
-        "messages": [{"role": "user", "content": messages_text}],
-        "response_format": {"type": "json_object"},
-    }
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, timeout=15) as resp:
-                if resp.status != 200:
-                    logger.warning(f"OpenRouter HTTP {resp.status}")
-                    return None
-                data = await resp.json()
-        choices = data.get("choices", [])
-        if not choices:
-            logger.warning("Pas de choices dans la réponse OpenRouter")
-            return None
-        text = choices[0].get("message", {}).get("content", "")
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start == -1 or end <= start:
-            logger.warning("Pas de JSON trouvé dans la réponse OpenRouter")
-            return None
-        result = json.loads(text[start:end])
-        required = {"external_catalyst", "shill_pattern_detected", "keywords", "narrative_strength"}
-        if not required.issubset(set(result.keys())):
-            logger.warning(f"Champs manquants dans le JSON OpenRouter : {result}")
-            return None
-        return result
-    except Exception as e:
-        logger.error(f"Erreur OpenRouter : {e}")
-        return None
-
-
-async def analyze_batch(buffer: list):
-    combined = "\n\n".join(buffer)
-    result = await call_gemini(combined)
-    if result is not None:
-        return result, "gemini"
-    result = await call_openrouter(combined)
-    if result is not None:
-        return result, "openrouter"
-    logger.warning("Échec de l'analyse : aucun provider disponible")
-    return None, None
-
-
-# Écoute Telegram
-@telegram_client.on(events.NewMessage(chats=True))
-async def handler(event):
-    global message_buffer
-    channel = event.chat_id
-    text = event.text or ""
-    channel_name = getattr(event.chat, "title", str(channel))
-    buffer_entry = f"[{channel_name}] {text}"
-    async with buffer_lock:
-        if len(message_buffer) >= 50:
-            message_buffer.pop(0)
-        message_buffer.append(buffer_entry)
-
-
-async def process_batch():
-    global message_buffer
-    async with buffer_lock:
-        if not message_buffer:
-            return
-        batch = list(message_buffer)
-        message_buffer.clear()
-    analysis, provider = await analyze_batch(batch)
-    if analysis is None:
-        logger.warning("Aucun résultat d'analyse")
+async def run_narrative_cycle(batch_msgs):
+    if not batch_msgs:
         return
-    # Vérifier si le bot est en pause
-    current_config = config_manager.load_config()
-    if current_config.get("bot_paused", False):
-        logger.info("⏸️ Bot en pause (Kill Switch) - Achat ignoré")
+    res = await call_gemini_v2(batch_msgs)
+    if not res or not isinstance(res, dict):
         return
+    from datetime import datetime
+    now_iso = datetime.now().isoformat()
     audit_entry = {
-        "timestamp": asyncio.get_event_loop().time(),
-        "provider": provider,
-        "result": analysis,
+        "timestamp": now_iso,
+        "provider": "gemini-2.5-flash",
+        "messages_count": len(batch_msgs),
+        "result": res
     }
-    audit_path = os.path.join(BASE_DIR, "logs", "narrative_audit.jsonl")
-    with open(audit_path, "a") as f:
-        f.write(json.dumps(audit_entry) + "\n")
-    if (analysis.get("external_catalyst") and
-            not analysis.get("shill_pattern_detected") and
-            analysis.get("narrative_strength", 0) >= 50):
-        keywords = analysis.get("keywords", [])
-        strength = analysis.get("narrative_strength", 0)
+    with open(AUDIT_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(audit_entry, ensure_ascii=False) + "\n")
+
+    keywords = [str(k).strip() for k in (res.get("keywords") or []) if len(str(k).strip()) >= 2]
+    strength = float(res.get("narrative_strength") or 0)
+    if keywords and strength > 0 and not res.get("shill_pattern_detected", False):
         add_narrative_signal(keywords, strength)
-    logger.info(f"Analyse terminée : provider={provider}, external_catalyst={analysis.get('external_catalyst')}")
+    logger.info(f"🧠 Audit IA enregistré : strength={strength}, keywords={keywords[:5]}")
 
+@telegram_client.on(events.NewMessage())
+async def handle_new_message(event):
+    try:
+        txt = event.raw_text or ""
+        if len(txt.strip()) >= 8:
+            append_to_buffer(txt)
+            async with buffer_lock:
+                message_buffer.append(txt.strip()[:300])
+                if len(message_buffer) > 50:
+                    message_buffer.pop(0)
+    except Exception:
+        pass
 
-# Lancement
 async def main():
     await telegram_client.start()
-    logger.info("✅ Client Telegram connecté")
-    await telegram_client.get_dialogs()
-    logger.info(f"📡 Canaux surveillés : {TG_CHANNELS}")
-    logger.info("🛰️  Début écoute des canaux Telegram toutes les 3 min")
-    while True:
-        await asyncio.sleep(180)
-        await process_batch()
+    logger.info("✅ Client Telegram connecté (V2 Temps Réel)")
+    # Amorçage immédiat depuis les derniers messages des dialogues pour peupler le Dashboard tout de suite
+    seed_msgs = []
+    try:
+        async for dialog in telegram_client.iter_dialogs(limit=15):
+            if dialog.is_channel or dialog.is_group:
+                async for msg in telegram_client.iter_messages(dialog.entity, limit=4):
+                    if msg.raw_text and len(msg.raw_text.strip()) >= 10:
+                        append_to_buffer(msg.raw_text)
+                        seed_msgs.append(msg.raw_text.strip()[:300])
+    except Exception as e:
+        logger.warning(f"Seed warning: {e}")
 
+    if seed_msgs:
+        logger.info(f"🚀 Amorçage initial Gemini sur {len(seed_msgs)} messages récents...")
+        await run_narrative_cycle(seed_msgs[-20:])
+
+    while True:
+        await asyncio.sleep(120)
+        async with buffer_lock:
+            batch = list(message_buffer)
+            message_buffer.clear()
+        if batch:
+            await run_narrative_cycle(batch)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    with telegram_client:
+        telegram_client.loop.run_until_complete(main())
